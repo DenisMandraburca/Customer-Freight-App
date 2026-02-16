@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# App data
+.gemini/
+.agent/
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
