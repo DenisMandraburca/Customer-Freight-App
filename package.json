@@ -1,0 +1,23 @@
+{
+  "name": "customer-freight-app-antigravity",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Antigravity Codex migration workspace for Customer Freight App",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @antigravity/api\" \"npm run dev -w @antigravity/web\"",
+    "dev:api": "npm run dev -w @antigravity/api",
+    "dev:web": "npm run dev -w @antigravity/web",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "migrate": "npm run migrate -w @antigravity/db"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.5",
+    "concurrently": "^9.2.1"
+  }
+}

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Dashboard - Customer Freight App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulsing {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="flex">
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-gray-800 text-white h-screen fixed left-0 top-0 overflow-y-auto">
+            <!-- User Profile -->
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-xl font-bold mb-2">Customer Freight App</h2>
+                <div class="text-sm text-gray-300">
+                    <div class="font-semibold text-white"><?= name ?></div>
+                    <div class="mt-1"><?= role ?></div>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+          <nav class="p-4">
+                <button 
+                    id="navManager" 
+                    onclick="switchView('manager')"
+                    class="w-full text-left px-4 py-3 mb-2 rounded-md bg-gray-700 text-white font-medium hover:bg-gray-600 transition-colors"
+                >
+                    Manager
+                </button>
+                <button 
+                    id="navCustomers" 
+                    onclick="switchView('customers')"
+                    class="w-full text-left px-4 py-3 mb-2 rounded-md bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 hover:text-white transition-colors"
+                >
+                    Customers
+                </button>
+                <button 
+                    id="navDispatcher" 
+                    onclick="switchView('dispatch')"
+                    class="w-full text-left px-4 py-3 rounded-md bg-gray-800 text-gray-300 font-medium hover:bg-gray-700 hover:text-white transition-colors"
+                >
+                    Dispatcher
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 ml-64">
+            <!-- Manager Content View -->
+            <div id="view-manager" class="min-h-screen">
+                <!-- Header -->
+                <header class="bg-white shadow-md">
+                    <div class="px-4 sm:px-6 lg:px-8 py-4">
+                        <h1 class="text-2xl font-bold text-gray-800">Manager Portal</h1>
+                    </div>
+                </header>
+                <?!= include('SalesContent') ?>
+            </div>
+
+            <!-- Customers Content View -->
+           <div id="view-customers" class="min-h-screen hidden">
+                <!-- Header -->
+                <header class="bg-white shadow-md">
+                    <div class="px-4 sm:px-6 lg:px-8 py-4">
+                        <h1 class="text-2xl font-bold text-gray-800">Customers</h1>
+                    </div>
+                </header>
+                <?!= include('CustomersContent') ?>
+            </div>
+
+            <!-- Dispatch Content View -->
+          <div id="view-dispatch" class="min-h-screen hidden">
+                <!-- Header -->
+              <header class="bg-white shadow-md">
+                    <div class="px-4 sm:px-6 lg:px-8 py-4">
+                        <h1 class="text-2xl font-bold text-gray-800">Dispatcher Portal</h1>
+                    </div>
+                </header>
+                <?!= include('DispatchContent') ?>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // View switching logic
+        function switchView(view) {
+            // Get all views
+            const managerView = document.getElementById('view-manager');
+            const customersView = document.getElementById('view-customers');
+            const dispatchView = document.getElementById('view-dispatch');
+            
+            // Get all navigation buttons
+            const managerBtn = document.getElementById('navManager');
+            const customersBtn = document.getElementById('navCustomers');
+            const dispatcherBtn = document.getElementById('navDispatcher');
+
+            // Hide all views
+            managerView.classList.add('hidden');
+            customersView.classList.add('hidden');
+            dispatchView.classList.add('hidden');
+
+            // Reset all buttons to inactive state
+            managerBtn.classList.remove('bg-gray-700', 'text-white');
+            managerBtn.classList.add('bg-gray-800', 'text-gray-300');
+            customersBtn.classList.remove('bg-gray-700', 'text-white');
+            customersBtn.classList.add('bg-gray-800', 'text-gray-300');
+            dispatcherBtn.classList.remove('bg-gray-700', 'text-white');
+            dispatcherBtn.classList.add('bg-gray-800', 'text-gray-300');
+
+            // Show selected view and activate button
+            if (view === 'manager') {
+                managerView.classList.remove('hidden');
+                managerBtn.classList.remove('bg-gray-800', 'text-gray-300');
+                managerBtn.classList.add('bg-gray-700', 'text-white');
+            } else if (view === 'customers') {
+                customersView.classList.remove('hidden');
+                customersBtn.classList.remove('bg-gray-800', 'text-gray-300');
+                customersBtn.classList.add('bg-gray-700', 'text-white');
+                // Load customers data when view is switched
+                if (typeof loadCustomersData === 'function') {
+                    loadCustomersData();
+                }
+            } else if (view === 'dispatch') {
+                dispatchView.classList.remove('hidden');
+                dispatcherBtn.classList.remove('bg-gray-800', 'text-gray-300');
+                dispatcherBtn.classList.add('bg-gray-700', 'text-white');
+            }
+        }
+    </script>
+</body>
+</html>
