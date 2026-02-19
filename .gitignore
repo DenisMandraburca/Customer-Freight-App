@@ -1,5 +1,15 @@
 # Dependencies
 node_modules/
+apps/web/dist/
+apps/api/dist/
+packages/db/dist/
+packages/shared/dist/
+packages/db/src/*.js
+packages/db/src/*.js.map
+packages/db/src/*.d.ts
+packages/shared/src/*.js
+packages/shared/src/*.js.map
+packages/shared/src/*.d.ts
 
 # Environment variables
 .env
@@ -7,6 +17,7 @@ node_modules/
 # App data
 .gemini/
 .agent/
+packages/db/data/
 
 # Windows system files
 Thumbs.db

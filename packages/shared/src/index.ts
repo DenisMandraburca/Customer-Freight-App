@@ -29,6 +29,7 @@ export interface SessionUser {
   email: string;
   role: UserRole;
   name: string;
+  full_load_access: boolean;
 }
 
 export interface CreateLoadInput {

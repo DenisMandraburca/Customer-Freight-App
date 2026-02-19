@@ -1,9 +1,6 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-import { PGlite } from '@electric-sql/pglite';
-import { Pool, type PoolConfig, type QueryResult } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
+import type { PoolConfig } from 'pg';
 
 export interface QueryResultLike<T = Record<string, unknown>> {
   rows: T[];
@@ -94,7 +91,7 @@ function isSupabaseConnectionString(value: string): boolean {
 }
 
 function resolveDatabaseUrl(): string | null {
-  // Prefer Supabase project-mode settings over legacy URI values.
+  // Prefer Supabase project-mode settings over direct URI values.
   const supabaseConnection = buildSupabaseConnectionStringFromEnv();
   if (supabaseConnection) {
     return supabaseConnection;
@@ -140,184 +137,100 @@ function resolveSslConfig(connectionString: string): PoolConfig['ssl'] | undefin
   return undefined;
 }
 
-function toRowCount(result: QueryResult | { rowCount?: number | null; rows?: unknown[]; affectedRows?: number }): number {
-  const rowsLength = Array.isArray(result.rows) ? result.rows.length : 0;
+function createPrismaClient(): PrismaClient {
+  const databaseUrl = resolveDatabaseUrl();
 
-  if (typeof result.rowCount === 'number') {
-    if (result.rowCount === 0 && rowsLength > 0) {
-      return rowsLength;
-    }
-    return result.rowCount;
+  if (!databaseUrl) {
+    throw new Error(
+      'DATABASE_URL (or SUPABASE_URL + SUPABASE_DB_PASSWORD, or SUPABASE_DB_URL) is required for PostgreSQL mode.',
+    );
   }
 
-  if ('affectedRows' in result && typeof result.affectedRows === 'number' && rowsLength === 0) {
-    return result.affectedRows;
+  if (!/^postgres(ql)?:\/\//i.test(databaseUrl)) {
+    throw new Error('DATABASE_URL must be a PostgreSQL connection string (postgres:// or postgresql://).');
   }
 
-  return rowsLength;
+  const ssl = resolveSslConfig(databaseUrl);
+  const connectionString =
+    ssl === false
+      ? databaseUrl
+      : ssl
+        ? `${databaseUrl}${databaseUrl.includes('?') ? '&' : '?'}sslmode=require`
+        : databaseUrl;
+
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter });
 }
 
 export class Database implements QueryExecutor {
-  private readonly pool?: Pool;
-  private readonly pglite?: PGlite;
-  private readonly isRemote: boolean;
-  private txQueue: Promise<void> = Promise.resolve();
+  private readonly prisma: PrismaClient;
 
-  private constructor(options: { pool?: Pool; pglite?: PGlite; isRemote: boolean }) {
-    this.pool = options.pool;
-    this.pglite = options.pglite;
-    this.isRemote = options.isRemote;
+  private constructor(prisma: PrismaClient) {
+    this.prisma = prisma;
   }
 
   static async create(): Promise<Database> {
-    const databaseUrl = resolveDatabaseUrl();
-
-    if (databaseUrl && /^https?:\/\//i.test(databaseUrl)) {
-      throw new Error(
-        'Invalid DB connection string. Use SUPABASE_URL + SUPABASE_DB_PASSWORD, or a postgres URI in DATABASE_URL/SUPABASE_DB_URL.',
-      );
-    }
-
-    if (databaseUrl && /^postgres(ql)?:\/\//i.test(databaseUrl)) {
-      const ssl = resolveSslConfig(databaseUrl);
-      const pool = new Pool({
-        connectionString: databaseUrl,
-        ...(ssl !== undefined ? { ssl } : {}),
-      });
-
-      return new Database({ pool, isRemote: true });
-    }
-
-    const explicitLocalDir = process.env.PGLITE_DATA_DIR;
-
-    if (explicitLocalDir === ':memory:') {
-      const pglite = new PGlite();
-      return new Database({ pglite, isRemote: false });
-    }
-
-    const srcDir = path.dirname(fileURLToPath(import.meta.url));
-    const packageRoot = path.resolve(srcDir, '..');
-    const localDataDir = explicitLocalDir
-      ? path.resolve(explicitLocalDir)
-      : path.join(packageRoot, 'data', 'local');
-
-    await fs.mkdir(localDataDir, { recursive: true });
-
-    const pglite = new PGlite(localDataDir);
-
-    return new Database({ pglite, isRemote: false });
+    return new Database(createPrismaClient());
   }
 
   get remote(): boolean {
-    return this.isRemote;
+    return true;
   }
 
   async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<QueryResultLike<T>> {
-    if (this.pool) {
-      const result = await this.pool.query(sql, params);
+    const normalized = sql.trim().toLowerCase();
+    const hasReturning = /\breturning\b/.test(normalized);
+    const expectsRows = hasReturning || normalized.startsWith('select') || normalized.startsWith('with');
+
+    if (expectsRows) {
+      const rows = (await this.prisma.$queryRawUnsafe(sql, ...params)) as T[];
       return {
-        rows: result.rows as T[],
-        rowCount: toRowCount(result),
+        rows: rows ?? [],
+        rowCount: rows?.length ?? 0,
       };
     }
 
-    if (!this.pglite) {
-      throw new Error('Database client is not initialized.');
-    }
-
-    const result = await this.pglite.query<T>(sql, params);
-
+    const rowCount = Number(await this.prisma.$executeRawUnsafe(sql, ...params));
     return {
-      rows: (result.rows ?? []) as T[],
-      rowCount: toRowCount(result),
+      rows: [],
+      rowCount: Number.isFinite(rowCount) ? rowCount : 0,
     };
   }
 
   async execScript(sql: string): Promise<void> {
-    if (this.pool) {
-      await this.pool.query(sql);
-      return;
-    }
-
-    if (!this.pglite) {
-      throw new Error('PGlite client is not initialized.');
-    }
-
-    await this.pglite.exec(sql);
+    await this.prisma.$executeRawUnsafe(sql);
   }
 
   async withTransaction<T>(handler: (tx: QueryExecutor) => Promise<T>): Promise<T> {
-    if (this.pool) {
-      const client = await this.pool.connect();
-      try {
-        await client.query('begin');
+    return this.prisma.$transaction(async (txClient) => {
+      const tx: QueryExecutor = {
+        query: async <R = Record<string, unknown>>(sql: string, params: unknown[] = []) => {
+          const normalized = sql.trim().toLowerCase();
+          const hasReturning = /\breturning\b/.test(normalized);
+          const expectsRows = hasReturning || normalized.startsWith('select') || normalized.startsWith('with');
 
-        const tx: QueryExecutor = {
-          query: async <R = Record<string, unknown>>(sql: string, params: unknown[] = []) => {
-            const result = await client.query(sql, params);
+          if (expectsRows) {
+            const rows = (await txClient.$queryRawUnsafe(sql, ...params)) as R[];
             return {
-              rows: result.rows as R[],
-              rowCount: toRowCount(result),
+              rows: rows ?? [],
+              rowCount: rows?.length ?? 0,
             };
-          },
-        };
+          }
 
-        const value = await handler(tx);
-        await client.query('commit');
-        return value;
-      } catch (error) {
-        await client.query('rollback');
-        throw error;
-      } finally {
-        client.release();
-      }
-    }
+          const rowCount = Number(await txClient.$executeRawUnsafe(sql, ...params));
+          return {
+            rows: [],
+            rowCount: Number.isFinite(rowCount) ? rowCount : 0,
+          };
+        },
+      };
 
-    if (!this.pglite) {
-      throw new Error('PGlite client is not initialized.');
-    }
-
-    let releaseLock: (() => void) | undefined;
-    const currentLock = new Promise<void>((resolve) => {
-      releaseLock = resolve;
+      return handler(tx);
     });
-
-    const previousLock = this.txQueue;
-    this.txQueue = previousLock.then(() => currentLock);
-
-    await previousLock;
-
-    const tx: QueryExecutor = {
-      query: async <R = Record<string, unknown>>(sql: string, params: unknown[] = []) => {
-        const result = await this.pglite!.query<R>(sql, params);
-        return {
-          rows: (result.rows ?? []) as R[],
-          rowCount: toRowCount(result),
-        };
-      },
-    };
-
-    try {
-      await tx.query('begin');
-      const value = await handler(tx);
-      await tx.query('commit');
-      return value;
-    } catch (error) {
-      await tx.query('rollback');
-      throw error;
-    } finally {
-      releaseLock?.();
-    }
   }
 
   async close(): Promise<void> {
-    if (this.pool) {
-      await this.pool.end();
-    }
-
-    if (this.pglite) {
-      await this.pglite.close();
-    }
+    await this.prisma.$disconnect();
   }
 }
 

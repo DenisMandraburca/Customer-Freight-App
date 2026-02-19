@@ -24,16 +24,16 @@
       </section>
 
       <section class="glass-panel mt-8 rounded-2xl border border-zinc-300/70 p-6 dark:border-zinc-700/70 md:mt-0">
-        <h2 class="text-lg font-semibold">Google Workspace Login</h2>
+        <h2 class="text-lg font-semibold">Portal Login</h2>
         <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-          Allowed domains: <code>@afctransport.com</code> and <code>@afclogistics.com</code>.
+          Authentication is managed by the AFC portal. Continue to the hub login page.
         </p>
         <button
           type="button"
           class="brand-button mt-6 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-red-300"
-          @click="startGoogleAuth"
+          @click="startPortalAuth"
         >
-          Continue with Google
+          Continue to Portal Login
         </button>
       </section>
     </div>
@@ -41,5 +41,5 @@
 </template>
 
 <script setup lang="ts">
-import { startGoogleAuth } from '@/api/auth';
+import { startPortalAuth } from '@/api/auth';
 </script>

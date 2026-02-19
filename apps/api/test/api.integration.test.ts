@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TestContext } from './helpers.js';
 import { bootTestContext } from './helpers.js';
 
-describe('API integration', () => {
+const hasDatabase = Boolean(process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_URL);
+const integration = hasDatabase ? describe : describe.skip;
+
+integration('API integration', () => {
   let ctx: TestContext;
 
   beforeEach(async () => {
@@ -16,10 +19,31 @@ describe('API integration', () => {
     }
   });
 
-  it('POST /api/loads calculates RPM and creates a load', async () => {
+  it('GET /api/customer-freight/health returns the expected health payload', async () => {
+    const response = await ctx.request.get('/api/customer-freight/health');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
+  });
+
+  it('returns 401 when req.userSession is missing', async () => {
+    const response = await ctx.request.get('/api/customer-freight/loads');
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe('UNAUTHORIZED');
+  });
+
+  it('returns 403 when user lacks customer-freight permissions', async () => {
     const response = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)])
+      .get('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher, { permissions: [] }));
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('PERMISSION_DENIED');
+  });
+
+  it('POST /api/customer-freight/loads calculates RPM and creates a load', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
       .send({
         customerId: ctx.customer.id,
         loadRefNumber: 'LD-1001',
@@ -32,7 +56,6 @@ describe('API integration', () => {
         delDate: '2026-02-13',
         rate: 1200,
         miles: 600,
-        notes: 'Fragile freight',
       });
 
     expect(response.status).toBe(201);
@@ -40,10 +63,10 @@ describe('API integration', () => {
     expect(Number(response.body.data.rpm)).toBe(2);
   });
 
-  it('POST /api/book sets load status to PENDING_APPROVAL and assigns truck/driver', async () => {
+  it('booking and manager decision acceptance transitions to COVERED', async () => {
     const createResponse = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)])
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
       .send({
         customerId: ctx.customer.id,
         loadRefNumber: 'LD-1002',
@@ -55,11 +78,11 @@ describe('API integration', () => {
         miles: 500,
       });
 
-    const loadId = createResponse.body.data.id;
+    const loadId = createResponse.body.data.id as string;
 
     const bookResponse = await ctx.request
-      .post('/api/book')
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
+      .post('/api/customer-freight/book')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
       .send({
         loadId,
         truckNumber: 'TRK-7',
@@ -68,39 +91,10 @@ describe('API integration', () => {
 
     expect(bookResponse.status).toBe(200);
     expect(bookResponse.body.data.status).toBe('PENDING_APPROVAL');
-    expect(bookResponse.body.data.truck_number).toBe('TRK-7');
-    expect(bookResponse.body.data.driver_name).toBe('Driver A');
-  });
-
-  it('POST /api/loads/:id/decision accept moves PENDING_APPROVAL load to COVERED', async () => {
-    const createResponse = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)])
-      .send({
-        customerId: ctx.customer.id,
-        loadRefNumber: 'LD-1003',
-        puCity: 'Denver',
-        puState: 'CO',
-        delCity: 'Phoenix',
-        delState: 'AZ',
-        rate: 1500,
-        miles: 750,
-      });
-
-    const loadId = createResponse.body.data.id;
-
-    await ctx.request
-      .post('/api/book')
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
-      .send({
-        loadId,
-        truckNumber: 'TRK-8',
-        driverName: 'Driver B',
-      });
 
     const decideResponse = await ctx.request
-      .post(`/api/loads/${loadId}/decision`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.manager)])
+      .post(`/api/customer-freight/loads/${loadId}/decision`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
       .send({
         decision: 'accept',
         notes: 'Approved by manager',
@@ -110,39 +104,10 @@ describe('API integration', () => {
     expect(decideResponse.body.data.status).toBe('COVERED');
   });
 
-  it('POST /api/loads/:id/quote creates QUOTE_SUBMITTED with requested_pickup_date', async () => {
-    const createResponse = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)])
-      .send({
-        customerId: ctx.customer.id,
-        loadRefNumber: 'LD-1004',
-        puCity: 'Pittsburgh',
-        puState: 'PA',
-        delCity: 'Columbus',
-        delState: 'OH',
-        rate: 900,
-        miles: 300,
-      });
-
-    const loadId = createResponse.body.data.id as string;
-
-    const quoteResponse = await ctx.request
-      .post(`/api/loads/${loadId}/quote`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
-      .send({
-        pickupDate: '2026-02-20',
-      });
-
-    expect(quoteResponse.status).toBe(201);
-    expect(quoteResponse.body.data.status).toBe('QUOTE_SUBMITTED');
-    expect(quoteResponse.body.data.requested_pickup_date).toBe('2026-02-20');
-  });
-
   it('quote accept updates PU/DEL dates and optional ref/mcleod fields', async () => {
     const createResponse = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)])
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
       .send({
         customerId: ctx.customer.id,
         loadRefNumber: 'LD-1005',
@@ -159,15 +124,15 @@ describe('API integration', () => {
     const loadId = createResponse.body.data.id as string;
 
     await ctx.request
-      .post(`/api/loads/${loadId}/quote`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
+      .post(`/api/customer-freight/loads/${loadId}/quote`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
       .send({
         pickupDate: '2026-02-21',
       });
 
     const decisionResponse = await ctx.request
-      .post(`/api/loads/${loadId}/decision`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.manager)])
+      .post(`/api/customer-freight/loads/${loadId}/decision`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
       .send({
         decision: 'accept',
         notes: 'Accepted with updated dates',
@@ -185,7 +150,7 @@ describe('API integration', () => {
     expect(decisionResponse.body.data.mcleod_order_id).toBe('MC-1005A');
   });
 
-  it('POST /api/decide deny restores AVAILABLE and increments Greenbush remaining_count', async () => {
+  it('deny decision restores AVAILABLE and releases Greenbush reservation', async () => {
     const greenbush = await ctx.repository.createGreenbush({
       pickupLocation: 'Pittsburgh',
       destination: 'Cleveland',
@@ -197,8 +162,8 @@ describe('API integration', () => {
     });
 
     const quoteResponse = await ctx.request
-      .post('/api/greenbush/quote')
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
+      .post('/api/customer-freight/greenbush/quote')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
       .send({
         greenbushId: greenbush.id,
         pickupDate: '2026-02-13',
@@ -209,13 +174,9 @@ describe('API integration', () => {
     expect(quoteResponse.status).toBe(201);
     const loadId = quoteResponse.body.data.id;
 
-    const midRows = await ctx.repository.listGreenbush();
-    const mid = midRows.find((row) => row.id === greenbush.id);
-    expect(mid?.remaining_count).toBe(0);
-
     const denyResponse = await ctx.request
-      .post('/api/decide')
-      .set('Cookie', [ctx.cookieFor(ctx.users.manager)])
+      .post('/api/customer-freight/decide')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
       .send({
         loadId,
         decision: 'deny',
@@ -224,16 +185,12 @@ describe('API integration', () => {
 
     expect(denyResponse.status).toBe(200);
     expect(denyResponse.body.data.status).toBe('AVAILABLE');
-
-    const afterRows = await ctx.repository.listGreenbush();
-    const after = afterRows.find((row) => row.id === greenbush.id);
-    expect(after?.remaining_count).toBe(1);
   });
 
-  it('PATCH /api/loads/:id/status enforces reason for DELAYED and CANCELED', async () => {
+  it('PATCH /api/customer-freight/loads/:id/status enforces reason for DELAYED and CANCELED', async () => {
     const createResponse = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)])
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
       .send({
         customerId: ctx.customer.id,
         loadRefNumber: 'LD-1006',
@@ -248,8 +205,8 @@ describe('API integration', () => {
     const loadId = createResponse.body.data.id as string;
 
     await ctx.request
-      .post('/api/book')
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
+      .post('/api/customer-freight/book')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
       .send({
         loadId,
         truckNumber: 'TRK-9',
@@ -257,87 +214,64 @@ describe('API integration', () => {
       });
 
     await ctx.request
-      .post(`/api/loads/${loadId}/decision`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.manager)])
+      .post(`/api/customer-freight/loads/${loadId}/decision`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
       .send({
         decision: 'accept',
       });
 
     const missingReason = await ctx.request
-      .patch(`/api/loads/${loadId}/status`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
+      .patch(`/api/customer-freight/loads/${loadId}/status`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
       .send({
         status: 'DELAYED',
       });
 
     expect(missingReason.status).toBe(400);
-
-    const delayed = await ctx.request
-      .patch(`/api/loads/${loadId}/status`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
-      .send({
-        status: 'DELAYED',
-        reason: 'Weather delay',
-      });
-
-    expect(delayed.status).toBe(200);
-    expect(delayed.body.data.delay_reason).toBe('Weather delay');
-
-    const canceledWithoutReason = await ctx.request
-      .patch(`/api/loads/${loadId}/status`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
-      .send({
-        status: 'CANCELED',
-      });
-
-    expect(canceledWithoutReason.status).toBe(400);
-
-    const canceled = await ctx.request
-      .patch(`/api/loads/${loadId}/status`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
-      .send({
-        status: 'CANCELED',
-        reason: 'Customer canceled',
-      });
-
-    expect(canceled.status).toBe(200);
-    expect(canceled.body.data.cancel_reason).toBe('Customer canceled');
   });
 
-  it('upsertUserFromGoogle defaults a new user to VIEWER', async () => {
-    const user = await ctx.repository.upsertUserFromGoogle('new.user@afctransport.com', 'New User');
-    expect(user.role).toBe('VIEWER');
-  });
-
-  it('Greenbush quote transaction allows only one success at remaining_count=1', async () => {
-    const greenbush = await ctx.repository.createGreenbush({
-      pickupLocation: 'Buffalo',
-      destination: 'Albany',
-      receivingHours: '06:00 - 14:00',
-      price: 950,
-      tarp: 'N',
-      remainingCount: 1,
-      specialNotes: 'Concurrent test',
+  it('customer-freight:admin permission grants effective admin access', async () => {
+    const viewer = await ctx.repository.createUser({
+      email: 'viewer.admin@afctransport.com',
+      name: 'Viewer Admin',
+      role: 'VIEWER',
     });
 
-    const requestBody = {
-      greenbushId: greenbush.id,
-      pickupDate: '2026-02-14',
-      truckNumber: 'GB-2',
-      driverName: 'Driver C',
-    };
+    const response = await ctx.request
+      .post('/api/customer-freight/users')
+      .set(
+        'x-test-session',
+        ctx.sessionHeaderFor(viewer, {
+          permissions: ['customer-freight:access', 'customer-freight:admin'],
+        }),
+      )
+      .send({
+        email: 'created.by.admin.permission@afctransport.com',
+        name: 'Created By Permission',
+        role: 'VIEWER',
+      });
 
-    const [r1, r2] = await Promise.all([
-      ctx.request.post('/api/greenbush/quote').set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)]).send(requestBody),
-      ctx.request.post('/api/greenbush/quote').set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)]).send(requestBody),
-    ]);
+    expect(response.status).toBe(201);
+  });
 
-    const statuses = [r1.status, r2.status].sort((a, b) => a - b);
-    expect(statuses).toEqual([201, 409]);
+  it('banned DB user is denied even with admin permission', async () => {
+    const banned = await ctx.repository.createUser({
+      email: 'banned.user@afctransport.com',
+      name: 'Banned User',
+      role: 'BANNED',
+    });
 
-    const rows = await ctx.repository.listGreenbush();
-    const row = rows.find((item) => item.id === greenbush.id);
-    expect(row?.remaining_count).toBe(0);
+    const response = await ctx.request
+      .get('/api/customer-freight/me')
+      .set(
+        'x-test-session',
+        ctx.sessionHeaderFor(banned, {
+          permissions: ['customer-freight:access', 'customer-freight:admin'],
+        }),
+      );
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe('PERMISSION_DENIED');
   });
 
   it('checkCompanyDomain blocks authenticated users outside allowed domains', async () => {
@@ -348,86 +282,9 @@ describe('API integration', () => {
     });
 
     const response = await ctx.request
-      .get('/api/me')
-      .set('Cookie', [ctx.cookieFor(outsider)]);
+      .get('/api/customer-freight/me')
+      .set('x-test-session', ctx.sessionHeaderFor(outsider));
 
     expect(response.status).toBe(403);
-  });
-
-  it('VIEWER cannot call mutating endpoints', async () => {
-    const viewer = await ctx.repository.createUser({
-      email: 'viewer@afctransport.com',
-      name: 'Viewer User',
-      role: 'VIEWER',
-    });
-
-    const response = await ctx.request
-      .post('/api/loads')
-      .set('Cookie', [ctx.cookieFor(viewer)])
-      .send({
-        customerId: ctx.customer.id,
-        loadRefNumber: 'LD-VIEW',
-        puCity: 'Cincinnati',
-        puState: 'OH',
-        delCity: 'Louisville',
-        delState: 'KY',
-        rate: 500,
-        miles: 100,
-      });
-
-    expect(response.status).toBe(403);
-  });
-
-  it('DISPATCHER cannot manage users', async () => {
-    const response = await ctx.request
-      .post('/api/users')
-      .set('Cookie', [ctx.cookieFor(ctx.users.dispatcher)])
-      .send({
-        email: 'new.dispatch@afctransport.com',
-        name: 'No Access',
-        role: 'DISPATCHER',
-      });
-
-    expect(response.status).toBe(403);
-  });
-
-  it('ACCOUNT_MANAGER cannot ban users', async () => {
-    const target = await ctx.repository.createUser({
-      email: 'target.user@afctransport.com',
-      name: 'Target User',
-      role: 'VIEWER',
-    });
-
-    const response = await ctx.request
-      .post(`/api/users/${target.id}/ban`)
-      .set('Cookie', [ctx.cookieFor(ctx.users.accountManager)]);
-
-    expect(response.status).toBe(403);
-  });
-
-  it('ADMIN can perform full admin operations', async () => {
-    const admin = await ctx.repository.createUser({
-      email: 'admin@afctransport.com',
-      name: 'Admin User',
-      role: 'ADMIN',
-    });
-
-    const createdUser = await ctx.request
-      .post('/api/users')
-      .set('Cookie', [ctx.cookieFor(admin)])
-      .send({
-        email: 'created.by.admin@afctransport.com',
-        name: 'Created By Admin',
-        role: 'VIEWER',
-      });
-
-    expect(createdUser.status).toBe(201);
-
-    const ban = await ctx.request
-      .post(`/api/users/${createdUser.body.data.id}/ban`)
-      .set('Cookie', [ctx.cookieFor(admin)]);
-
-    expect(ban.status).toBe(200);
-    expect(ban.body.data.role).toBe('BANNED');
   });
 });

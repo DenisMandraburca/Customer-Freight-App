@@ -6,13 +6,13 @@
 
 :root {
   color-scheme: light;
-  --app-bg: radial-gradient(circle at 12% 12%, rgba(191, 0, 0, 0.12), transparent 44%),
-    radial-gradient(circle at 88% 16%, rgba(0, 0, 0, 0.06), transparent 40%),
-    linear-gradient(140deg, #f7f7f7 0%, #ffffff 48%, #f2f2f2 100%);
-  --card-bg: rgba(255, 255, 255, 0.82);
-  --card-border: rgba(17, 17, 17, 0.1);
-  --text-main: #121212;
-  --text-soft: #3f3f46;
+  --app-bg: radial-gradient(circle at 12% 12%, rgba(191, 0, 0, 0.08), transparent 44%),
+    radial-gradient(circle at 88% 16%, rgba(0, 0, 0, 0.04), transparent 40%),
+    linear-gradient(140deg, #f8f8f8 0%, #ffffff 48%, #f4f4f4 100%);
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(17, 17, 17, 0.08);
+  --text-main: #18181b;
+  --text-soft: #52525b;
   --brand-primary: #bf0000;
   --brand-primary-strong: #960000;
   --brand-ink: #121212;
@@ -21,17 +21,17 @@
 
 .dark {
   color-scheme: dark;
-  --app-bg: radial-gradient(circle at 10% 8%, rgba(191, 0, 0, 0.26), transparent 42%),
-    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.06), transparent 32%),
-    linear-gradient(160deg, #0d0d0d 0%, #121212 48%, #050505 100%);
-  --card-bg: rgba(20, 20, 20, 0.7);
-  --card-border: rgba(255, 255, 255, 0.14);
-  --text-main: #f5f5f5;
-  --text-soft: #d4d4d8;
+  --app-bg: radial-gradient(circle at 10% 8%, rgba(191, 0, 0, 0.2), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.04), transparent 32%),
+    linear-gradient(160deg, #09090b 0%, #121212 48%, #040405 100%);
+  --card-bg: rgba(24, 24, 27, 0.75);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --text-main: #fafafa;
+  --text-soft: #a1a1aa;
   --brand-primary: #d70f0f;
   --brand-primary-strong: #ff4d4d;
-  --brand-ink: #f5f5f5;
-  --brand-surface: #111111;
+  --brand-ink: #fafafa;
+  --brand-surface: #09090b;
 }
 
 body {
@@ -39,30 +39,43 @@ body {
   background: var(--app-bg);
   color: var(--text-main);
   font-family: 'Inter', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .glass-panel {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
 }
 
 .brand-logo {
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
 }
 
 .brand-button {
   background: var(--brand-primary);
   color: #ffffff;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .brand-button:hover {
   background: var(--brand-primary-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(191, 0, 0, 0.2);
+}
+
+.brand-button:active {
+  transform: translateY(0);
 }
 
 .brand-tag {
-  border: 1px solid rgba(191, 0, 0, 0.3);
-  background: rgba(191, 0, 0, 0.08);
+  border: 1px solid rgba(191, 0, 0, 0.2);
+  background: rgba(191, 0, 0, 0.04);
   color: var(--brand-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
 }
+

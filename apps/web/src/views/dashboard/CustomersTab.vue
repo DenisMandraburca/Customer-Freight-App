@@ -1,123 +1,119 @@
 <template>
   <section class="space-y-4">
     <header class="flex items-center justify-between">
-      <h3 class="text-lg font-bold">Customers</h3>
-      <p class="text-sm text-zinc-600 dark:text-zinc-300">{{ filteredCustomers.length }} shown</p>
+      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-500">Customers</h3>
+      <p class="text-xs text-zinc-500">{{ filteredCustomers.length }} shown</p>
     </header>
 
-    <label class="block text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-300">
-      Search
-      <input
-        v-model="search"
-        class="mt-1 w-full rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70"
-        placeholder="Customer name"
-      />
-    </label>
+    <div class="mb-4 flex flex-col gap-4 lg:flex-row">
+      <div class="w-full glass-panel rounded-xl p-4 space-y-3 lg:w-[30%]">
+        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Search</h3>
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search by name..."
+          class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <select
+          v-model="typeFilter"
+          class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          <option value="">All Types</option>
+          <option value="Direct Customer">Direct Customer</option>
+          <option value="Broker">Broker</option>
+        </select>
+      </div>
 
-    <div class="overflow-x-auto rounded-2xl border border-zinc-300/70 bg-white/90 dark:border-zinc-700 dark:bg-zinc-900/60">
-      <table class="min-w-full text-sm">
-        <thead class="bg-zinc-200/70 text-xs uppercase tracking-wide text-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-300">
-          <tr>
-            <th class="px-3 py-3 text-left">Name</th>
-            <th class="px-3 py-3 text-left">Type</th>
-            <th class="px-3 py-3 text-left">Quote</th>
-            <th class="px-3 py-3 text-left">Delivered</th>
-            <th class="px-3 py-3 text-left">Delivered Rate</th>
-            <th class="px-3 py-3 text-left">Canceled</th>
-            <th class="px-3 py-3 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="customer in filteredCustomers" :key="customer.id" class="border-t border-zinc-200/70 dark:border-zinc-800">
-            <td class="px-3 py-2 font-semibold">{{ customer.name }}</td>
-            <td class="px-3 py-2">{{ customer.type }}</td>
-            <td class="px-3 py-2">
-              <span
-                class="rounded-full px-2 py-0.5 text-xs font-semibold"
-                :class="customer.quote_accept ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200'"
-              >
-                {{ customer.quote_accept ? 'Enabled' : 'Disabled' }}
-              </span>
-            </td>
-            <td class="px-3 py-2">{{ customer.total_delivered ?? 0 }}</td>
-            <td class="px-3 py-2">${{ numberFormat(customer.total_rate_delivered ?? '0') }}</td>
-            <td class="px-3 py-2">{{ customer.total_canceled ?? 0 }}</td>
-            <td class="px-3 py-2">
-              <div v-if="canManage" class="flex gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg bg-zinc-900 px-2 py-1 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  @click="startEdit(customer)"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg bg-rose-600 px-2 py-1 text-xs font-semibold text-white"
-                  @click="emit('delete', customer.id)"
-                >
-                  Delete
-                </button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="filteredCustomers.length === 0">
-            <td colspan="7" class="px-3 py-6 text-center text-sm text-zinc-600 dark:text-zinc-300">No customers match current search.</td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-if="canManage" class="flex-1 glass-panel rounded-xl p-4">
+        <h3 class="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">
+          {{ editingCustomer ? 'Edit Customer' : 'Add Customer' }}
+        </h3>
+        <form class="grid grid-cols-1 gap-3 sm:grid-cols-3" @submit.prevent="saveCustomer">
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Customer Name
+            <input
+              v-model="form.name"
+              required
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </label>
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Type
+            <select
+              v-model="form.type"
+              required
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              <option value="Direct Customer">Direct Customer</option>
+              <option value="Broker">Broker</option>
+            </select>
+          </label>
+          <label class="flex items-center gap-2 pt-4 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+            <input v-model="form.quoteAccept" type="checkbox" />
+            Allow PU Date Quotes
+          </label>
+          <div class="col-span-full flex gap-2">
+            <button
+              type="submit"
+              class="rounded-lg border border-red-700 bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+            >
+              {{ editingCustomer ? 'Save Changes' : 'Add Customer' }}
+            </button>
+            <button
+              v-if="editingCustomer"
+              type="button"
+              class="rounded-lg border border-zinc-300 px-4 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              @click="cancelEdit"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
-    <article
-      v-if="canManage"
-      class="rounded-2xl border border-zinc-300/70 bg-white/90 p-4 dark:border-zinc-700 dark:bg-zinc-900/60"
-    >
-      <h4 class="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
-        {{ editingId ? 'Edit Customer' : 'Create Customer' }}
-      </h4>
-      <div class="mt-3 grid gap-3 md:grid-cols-3">
-        <label class="text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-300 md:col-span-2">
-          Name
-          <input
-            v-model="form.name"
-            class="mt-1 w-full rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70"
-          />
-        </label>
-        <label class="text-xs font-semibold uppercase text-zinc-600 dark:text-zinc-300">
-          Type
-          <select
-            v-model="form.type"
-            class="mt-1 w-full rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70"
-          >
-            <option value="Direct Customer">Direct Customer</option>
-            <option value="Broker">Broker</option>
-          </select>
-        </label>
+    <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-xs">
+          <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+            <tr>
+              <th class="px-3 py-2">Customer</th>
+              <th class="px-3 py-2">Type</th>
+              <th class="px-3 py-2">Total Delivered</th>
+              <th class="px-3 py-2">Total Rate</th>
+              <th class="px-3 py-2">Loads Canceled</th>
+              <th class="px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <tr v-for="customer in filteredCustomers" :key="customer.id">
+              <td class="px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold">{{ customer.name }}</span>
+                  <span :class="customer.quote_accept ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200'" class="rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                    {{ customer.quote_accept ? 'Quote ?' : 'No Quote' }}
+                  </span>
+                  <span v-if="isDuplicate(customer.name)" class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Duplicate</span>
+                </div>
+              </td>
+              <td class="px-3 py-2">{{ customer.type }}</td>
+              <td class="px-3 py-2">{{ customer.total_delivered ?? 0 }}</td>
+              <td class="px-3 py-2">${{ money(customer.total_rate_delivered ?? '0') }}</td>
+              <td class="px-3 py-2">{{ customer.total_canceled ?? 0 }}</td>
+              <td class="px-3 py-2 text-right">
+                <div v-if="canManage" class="inline-flex gap-1">
+                  <button type="button" class="rounded bg-zinc-900 px-2 py-1 text-[10px] font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900" @click="startEdit(customer)">Edit</button>
+                  <button type="button" class="rounded bg-rose-700 px-2 py-1 text-[10px] font-semibold text-white" @click="emit('delete', customer.id)">Delete</button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="filteredCustomers.length === 0">
+              <td colspan="6" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <label class="mt-3 flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200">
-        <input v-model="form.quoteAccept" type="checkbox" />
-        Quote Accepted
-      </label>
-      <p v-if="hasDuplicateName" class="mt-2 text-xs text-rose-600 dark:text-rose-400">A customer with this name already exists.</p>
-      <div class="mt-3 flex gap-2">
-        <button
-          type="button"
-          class="brand-button rounded-lg px-3 py-2 text-xs font-semibold"
-          :disabled="!canSubmit"
-          @click="submit"
-        >
-          {{ editingId ? 'Update Customer' : 'Create Customer' }}
-        </button>
-        <button
-          v-if="editingId"
-          type="button"
-          class="rounded-lg bg-zinc-200 px-3 py-2 text-xs font-semibold dark:bg-zinc-700"
-          @click="resetForm"
-        >
-          Cancel
-        </button>
-      </div>
-    </article>
+    </div>
   </section>
 </template>
 
@@ -138,7 +134,8 @@ const emit = defineEmits<{
 }>();
 
 const search = ref('');
-const editingId = ref('');
+const typeFilter = ref('');
+const editingCustomer = ref<CustomerRecord | null>(null);
 
 const form = reactive({
   name: '',
@@ -146,66 +143,65 @@ const form = reactive({
   quoteAccept: false,
 });
 
-const filteredCustomers = computed(() => {
-  const term = search.value.trim().toLowerCase();
-  if (!term) {
-    return props.customers;
+const nameCounts = computed(() => {
+  const counts = new Map<string, number>();
+  for (const customer of props.customers) {
+    const key = customer.name.trim().toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-
-  return props.customers.filter((customer) => customer.name.toLowerCase().includes(term));
+  return counts;
 });
 
-const hasDuplicateName = computed(() => {
-  const normalized = form.name.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-
-  return props.customers.some((customer) => {
-    if (editingId.value && customer.id === editingId.value) {
-      return false;
-    }
-    return customer.name.trim().toLowerCase() === normalized;
+const filteredCustomers = computed(() => {
+  const term = search.value.trim().toLowerCase();
+  return props.customers.filter((customer) => {
+    if (typeFilter.value && customer.type !== typeFilter.value) return false;
+    if (!term) return true;
+    return `${customer.name} ${customer.type}`.toLowerCase().includes(term);
   });
 });
 
-const canSubmit = computed(() => form.name.trim().length > 0 && !hasDuplicateName.value);
+function isDuplicate(name: string): boolean {
+  return (nameCounts.value.get(name.trim().toLowerCase()) ?? 0) > 1;
+}
 
-function submit(): void {
-  if (!canSubmit.value) {
-    return;
-  }
-
+function saveCustomer(): void {
   const payload = {
     name: form.name.trim(),
     type: form.type,
     quoteAccept: form.quoteAccept,
   };
 
-  if (editingId.value) {
-    emit('update', { id: editingId.value, data: payload });
+  if (!payload.name) {
+    return;
+  }
+
+  if (editingCustomer.value) {
+    emit('update', { id: editingCustomer.value.id, data: payload });
   } else {
     emit('create', payload);
   }
-  resetForm();
+
+  cancelEdit();
 }
 
 function startEdit(customer: CustomerRecord): void {
-  editingId.value = customer.id;
+  editingCustomer.value = customer;
   form.name = customer.name;
   form.type = customer.type;
   form.quoteAccept = customer.quote_accept;
 }
 
-function resetForm(): void {
-  editingId.value = '';
+function cancelEdit(): void {
+  editingCustomer.value = null;
   form.name = '';
   form.type = 'Direct Customer';
   form.quoteAccept = false;
 }
 
-function numberFormat(value: string | number): string {
+function money(value: string | number): string {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed.toFixed(2) : '0.00';
+  if (!Number.isFinite(parsed)) return '0.00';
+  return parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 </script>

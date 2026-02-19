@@ -1,15 +1,18 @@
 import type { SessionUser } from '@antigravity/shared';
 
+export interface PortalUserSession {
+  id: string;
+  email: string;
+  name: string | null;
+  isSuperAdmin: boolean;
+  permissions: string[];
+}
+
 declare global {
   namespace Express {
     interface Request {
       user?: SessionUser;
-      authEmail?: string;
-      oauthProfile?: {
-        email: string;
-        name: string;
-        emailVerified: boolean;
-      };
+      userSession?: PortalUserSession;
     }
   }
 }

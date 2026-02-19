@@ -1,35 +1,43 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 
 import type { Database } from './client.js';
 
-export async function runMigrations(db: Database): Promise<void> {
-  await db.query(`
-    create table if not exists schema_migrations (
-      filename text primary key,
-      executed_at timestamptz not null default now()
-    );
-  `);
+const srcDir = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.resolve(srcDir, '..');
+const configPath = path.join(packageRoot, 'prisma.config.ts');
 
-  const srcDir = path.dirname(fileURLToPath(import.meta.url));
-  const migrationsDir = path.resolve(srcDir, '..', 'migrations');
-  const files = (await fs.readdir(migrationsDir))
-    .filter((file) => file.endsWith('.sql'))
-    .sort((a, b) => a.localeCompare(b));
+let migrationsExecuted = false;
 
-  for (const file of files) {
-    const alreadyRan = await db.query<{ filename: string }>(
-      'select filename from schema_migrations where filename = $1',
-      [file],
-    );
+function resolvePrismaBin(): string {
+  return process.platform === 'win32' ? 'prisma.cmd' : 'prisma';
+}
 
-    if (alreadyRan.rowCount > 0) {
-      continue;
-    }
+async function runPrismaCommand(args: string[]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(resolvePrismaBin(), args, {
+      cwd: packageRoot,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
 
-    const sql = await fs.readFile(path.join(migrationsDir, file), 'utf8');
-    await db.execScript(sql);
-    await db.query('insert into schema_migrations(filename) values ($1)', [file]);
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Prisma command failed with exit code ${code}.`));
+    });
+  });
+}
+
+export async function runMigrations(_db?: Database): Promise<void> {
+  if (migrationsExecuted || process.env.SKIP_DB_MIGRATIONS === 'true') {
+    return;
   }
+
+  await runPrismaCommand(['migrate', 'deploy', '--config', configPath]);
+  migrationsExecuted = true;
 }

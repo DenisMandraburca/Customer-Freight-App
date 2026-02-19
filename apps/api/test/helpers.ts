@@ -1,17 +1,9 @@
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
-
 import type { FreightRepository, UserRecord, CustomerRecord } from '@antigravity/db';
-import { closeDb, createRepository } from '@antigravity/db';
+import { closeDb, createRepository, getDb, runMigrations } from '@antigravity/db';
 
 import supertest from 'supertest';
 
 import type { Express } from 'express';
-
-import { SESSION_COOKIE_NAME } from '../src/config.js';
-import { signSession } from '../src/security.js';
 
 export interface TestContext {
   app: Express;
@@ -23,32 +15,30 @@ export interface TestContext {
     dispatcher: UserRecord;
   };
   customer: CustomerRecord;
-  cookieFor: (user: UserRecord) => string;
+  sessionHeaderFor: (
+    user: UserRecord,
+    options?: { permissions?: string[]; isSuperAdmin?: boolean },
+  ) => string;
   cleanup: () => Promise<void>;
 }
 
 export async function bootTestContext(): Promise<TestContext> {
-  const testDbDir = path.join(os.tmpdir(), `cfa-pglite-${randomUUID()}`);
-  process.env.PGLITE_DATA_DIR = testDbDir;
-
-  const envKeys = [
-    'DATABASE_URL',
-    'SUPABASE_URL',
-    'SUPABASE_DB_URL',
-    'SUPABASE_DB_PASSWORD',
-    'SUPABASE_DB_HOST',
-    'SUPABASE_DB_PORT',
-    'SUPABASE_DB_USER',
-    'SUPABASE_DB_NAME',
-  ] as const;
-
-  const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]])) as Record<string, string | undefined>;
-  for (const key of envKeys) {
-    delete process.env[key];
+  if (!process.env.DATABASE_URL && !process.env.SUPABASE_DB_URL && !process.env.SUPABASE_URL) {
+    throw new Error('DATABASE_URL (or SUPABASE_DB_URL/SUPABASE_URL) is required for API integration tests.');
   }
 
   await closeDb();
+  await runMigrations();
   const repository = await createRepository();
+  const db = await getDb();
+  await db.query(
+    `truncate table
+      loads,
+      greenbush_bank,
+      customers,
+      users
+     restart identity cascade`,
+  );
 
   const manager = await repository.createUser({
     email: 'manager@afctransport.com',
@@ -75,30 +65,41 @@ export async function bootTestContext(): Promise<TestContext> {
   });
 
   const { createApp } = await import('../src/app.js');
-  const app = createApp(repository);
+  const app = createApp(repository, {
+    portalSessionMiddleware: (req, _res, next) => {
+      const raw = req.header('x-test-session');
+      if (raw) {
+        const decoded = Buffer.from(raw, 'base64url').toString('utf8');
+        req.userSession = JSON.parse(decoded) as {
+          id: string;
+          email: string;
+          name: string | null;
+          isSuperAdmin: boolean;
+          permissions: string[];
+        };
+      }
+      next();
+    },
+  });
   const request = supertest(app);
 
-  const cookieFor = (user: UserRecord): string => {
-    const token = signSession({
-      sub: user.id,
+  const sessionHeaderFor = (
+    user: UserRecord,
+    options: { permissions?: string[]; isSuperAdmin?: boolean } = {},
+  ): string => {
+    const session = {
+      id: user.id,
       email: user.email,
-      role: user.role,
       name: user.name,
-    });
+      isSuperAdmin: options.isSuperAdmin ?? false,
+      permissions: options.permissions ?? ['customer-freight:access'],
+    };
 
-    return `${SESSION_COOKIE_NAME}=${token}`;
+    return Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');
   };
 
   const cleanup = async (): Promise<void> => {
     await closeDb();
-    await fs.rm(testDbDir, { recursive: true, force: true });
-    for (const key of envKeys) {
-      if (previousEnv[key] === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = previousEnv[key];
-      }
-    }
   };
 
   return {
@@ -107,7 +108,7 @@ export async function bootTestContext(): Promise<TestContext> {
     repository,
     users: { manager, accountManager, dispatcher },
     customer,
-    cookieFor,
+    sessionHeaderFor,
     cleanup,
   };
 }

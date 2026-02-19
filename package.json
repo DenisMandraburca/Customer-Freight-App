@@ -8,10 +8,12 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "npm run build -w @antigravity/shared && npm run build -w @antigravity/db",
     "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @antigravity/api\" \"npm run dev -w @antigravity/web\"",
     "dev:api": "npm run dev -w @antigravity/api",
     "dev:web": "npm run dev -w @antigravity/web",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @antigravity/shared && npm run build -w @antigravity/db && npm run build -w @antigravity/api && npm run build -w @antigravity/web",
+    "pretest": "npm run build -w @antigravity/shared && npm run build -w @antigravity/db",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "migrate": "npm run migrate -w @antigravity/db"

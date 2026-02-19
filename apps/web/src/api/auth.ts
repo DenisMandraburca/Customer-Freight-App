@@ -2,17 +2,17 @@ import type { SessionUser } from '@/types/models';
 
 import { unwrap } from './http';
 
-export function startGoogleAuth(): void {
-  window.location.href = '/api/auth/google/start';
+const API_BASE = '/api/customer-freight';
+
+export function startPortalAuth(): void {
+  window.location.href = '/apps/hub/login';
 }
 
 export async function getCurrentSession(): Promise<SessionUser> {
-  return unwrap<SessionUser>('/api/me');
+  return unwrap<SessionUser>(`${API_BASE}/me`);
 }
 
 export async function logout(): Promise<void> {
-  await fetch('/api/auth/logout', {
-    method: 'POST',
-    credentials: 'include',
-  });
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user');
 }

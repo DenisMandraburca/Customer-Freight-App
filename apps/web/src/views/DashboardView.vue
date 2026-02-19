@@ -1,168 +1,702 @@
 <template>
-  <div class="min-h-screen px-4 py-4 md:px-6 md:py-6">
-    <div class="mx-auto flex min-h-[92vh] max-w-[1600px] gap-4">
-      <aside class="glass-panel rounded-3xl p-4" :class="ui.sidebarWidthClass">
+  <div class="min-h-screen px-3 py-3 md:px-4 md:py-4">
+    <div class="mx-auto flex min-h-[94vh] max-w-[1700px] gap-3">
+      <aside class="glass-panel rounded-2xl p-3" :class="ui.sidebarWidthClass">
         <div class="flex h-full flex-col">
-          <div class="mb-6 flex items-center justify-between">
+          <div class="mb-4 flex items-center justify-between px-1">
             <div class="flex items-center gap-2" :class="{ 'sr-only': ui.navCollapsed }">
-              <img src="https://afctransport.com/wp-content/themes/AFC/img/logo.png" alt="AFC" class="brand-logo h-7 w-auto" />
-              <h1 class="text-sm font-extrabold tracking-[0.16em] text-zinc-800 dark:text-zinc-100">AFC OPS</h1>
+              <img src="https://afctransport.com/wp-content/themes/AFC/img/logo.png" alt="AFC" class="brand-logo h-6 w-auto" />
+              <h1 class="text-xs font-black tracking-[0.2em] text-zinc-900 dark:text-zinc-50">AFC OPS</h1>
             </div>
-            <button class="brand-button rounded-lg px-2 py-1 text-xs font-semibold" @click="ui.toggleNav">{{ ui.navCollapsed ? '>>' : '<<' }}</button>
+            <button class="brand-button flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-bold" @click="ui.toggleNav">
+              <ChevronRight v-if="ui.navCollapsed" class="h-3.5 w-3.5" />
+              <ChevronLeft v-else class="h-3.5 w-3.5" />
+            </button>
           </div>
-          <nav class="space-y-2">
+
+          <nav class="space-y-1">
             <button
               v-for="item in navItems"
               :key="item.id"
-              class="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold transition"
-              :class="activeTab === item.id ? 'bg-red-700 text-white dark:bg-red-600' : 'text-zinc-700 hover:bg-zinc-200/80 dark:text-zinc-200 dark:hover:bg-zinc-800/70'"
+              class="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-all"
+              :class="activeTab === item.id ? 'bg-red-700 text-white shadow-sm dark:bg-red-600' : 'text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/50'"
               @click="activeTab = item.id"
             >
-              <span class="flex items-center gap-2"><span>{{ item.icon }}</span><span v-if="!ui.navCollapsed">{{ item.label }}</span></span>
-              <span v-if="item.badge && !ui.navCollapsed" class="rounded-full bg-white/20 px-2 py-0.5 text-xs">{{ item.badge }}</span>
+              <span class="flex items-center gap-2.5">
+                <span class="flex w-5 justify-center">
+                  <component :is="item.icon" class="h-4 w-4" />
+                </span>
+                <span v-if="!ui.navCollapsed">{{ item.label }}</span>
+              </span>
+              <span v-if="item.badge && !ui.navCollapsed" class="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">{{ item.badge }}</span>
             </button>
           </nav>
-          <div class="mt-auto space-y-2">
-            <button class="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-200/80 dark:text-zinc-200 dark:hover:bg-zinc-800/70" @click="ui.toggleTheme">
-              <span>DM</span><span v-if="!ui.navCollapsed">{{ ui.darkMode ? 'Light' : 'Dark' }} Mode</span>
+
+          <div class="mt-auto space-y-1 border-t border-zinc-200/50 pt-4 dark:border-zinc-800/50">
+            <button class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-zinc-800/50" @click="ui.toggleTheme">
+              <span class="flex w-5 justify-center">
+                <Sun v-if="ui.darkMode" class="h-4 w-4" />
+                <Moon v-else class="h-4 w-4" />
+              </span>
+              <span v-if="!ui.navCollapsed">{{ ui.darkMode ? 'Light' : 'Dark' }} Mode</span>
             </button>
-            <button class="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/30" @click="handleLogout">
-              <span>LO</span><span v-if="!ui.navCollapsed">Logout</span>
+            <button class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" @click="handleLogout">
+              <span class="flex w-5 justify-center">
+                <LogOut class="h-4 w-4" />
+              </span>
+              <span v-if="!ui.navCollapsed">Logout</span>
             </button>
           </div>
         </div>
       </aside>
 
-      <main class="flex-1">
-        <header class="glass-panel rounded-3xl px-6 py-5">
+      <main class="flex flex-1 flex-col gap-3">
+        <header class="glass-panel rounded-2xl px-5 py-3.5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p class="text-xs uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-300">AFC Transport Operations Dashboard</p>
-              <h2 class="text-2xl font-extrabold">Welcome, {{ currentUser?.name }}</h2>
+              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">Operations Dashboard</p>
+              <h2 class="text-xl font-black tracking-tight text-zinc-900 dark:text-white">Welcome, {{ currentUser?.name }}</h2>
             </div>
-            <div class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">{{ roleLabel(currentUser?.role) }}</div>
+            <div class="rounded-lg bg-zinc-900/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-700 ring-1 ring-inset ring-zinc-900/10 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10">
+              {{ roleLabel(currentUser?.role) }}
+            </div>
           </div>
         </header>
 
-        <section v-if="canCreateLoad" class="mt-4 glass-panel rounded-3xl p-5">
-          <h3 class="text-lg font-bold">New Load</h3>
-          <form class="mt-3 grid gap-3 md:grid-cols-4" @submit.prevent="submitQuickLoad">
-            <select v-model="quickLoadForm.customerId" required class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70">
-              <option value="" disabled>Select customer</option>
-              <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
-            </select>
-            <input v-model="quickLoadForm.loadRefNumber" required placeholder="Load Ref #" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <input v-model="quickLoadForm.puCity" required placeholder="PU City" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <input v-model="quickLoadForm.puState" required maxlength="2" placeholder="PU ST" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm uppercase dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <input v-model="quickLoadForm.delCity" required placeholder="DEL City" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <input v-model="quickLoadForm.delState" required maxlength="2" placeholder="DEL ST" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm uppercase dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <input v-model.number="quickLoadForm.rate" required type="number" min="0" step="0.01" placeholder="Rate" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <input v-model.number="quickLoadForm.miles" required type="number" min="1" step="0.01" placeholder="Miles" class="rounded-lg border border-zinc-300/70 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/70" />
-            <button type="submit" class="brand-button rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60" :disabled="busy">{{ busy ? 'Saving...' : 'Create Load' }}</button>
-          </form>
-        </section>
-
-        <section class="mt-4 glass-panel rounded-3xl p-5">
-          <div v-if="query.isLoading.value" class="rounded-xl bg-zinc-100 px-4 py-3 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">Loading...</div>
-          <div v-else-if="query.isError.value" class="rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-200">{{ (query.error.value as Error).message }}</div>
-          <template v-else>
-            <div v-if="errorMsg" class="mb-3 rounded-xl bg-red-100 px-4 py-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-200">{{ errorMsg }}</div>
-            <AvailableLoadsTab v-if="activeTab === 'available'" :loads="loads" :can-book="canBook" :can-quote="canQuoteLoads" @book="bookPrompt" @quote="quotePrompt" />
-            <MyLoadsTab v-else-if="activeTab === 'my-loads'" :loads="loads" :user="currentUser" :can-decide="canDecide" :can-update-status="canBook" @open-decision="decisionPrompt" @set-status="statusPrompt" />
-            <AllLoadsTab v-else-if="activeTab === 'all-loads'" :loads="loads" :customers="customers" :users="users" :can-edit="canEditLoads" @edit="editLoadPrompt" />
-            <CustomersTab v-else-if="activeTab === 'customers'" :customers="customers" :can-manage="canManageCustomers" @create="createCustomerAction" @update="updateCustomerAction" @delete="deleteCustomerAction" />
-            <UsersTab v-else-if="activeTab === 'users'" :users="users" :can-manage="canManageUsers" :current-user-id="currentUser?.sub ?? ''" @create="createUserAction" @update="updateUserAction" @delete="deleteUserAction" @ban="banUserAction" />
-            <GreenbushTab v-else-if="activeTab === 'greenbush'" :rows="greenbush" :can-manage="canManageGreenbush" :can-quote="canBook" @open-quote="greenbushQuotePrompt" @create="createGreenbushAction" @update="updateGreenbushAction" @increment="incrementGreenbushAction" @bulk-replace="bulkReplaceGreenbushAction" />
-            <ReportsTab v-else />
-          </template>
+        <section class="flex flex-1 flex-col overflow-hidden rounded-2xl glass-panel">
+          <div class="flex-1 overflow-auto p-4">
+            <div v-if="query.isLoading.value" class="flex h-32 items-center justify-center text-xs font-medium text-zinc-400">Loading data...</div>
+            <div v-else-if="query.isError.value" class="rounded-lg bg-red-50 p-3 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{{ (query.error.value as Error).message }}</div>
+            <template v-else>
+              <div v-if="errorMsg" class="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{{ errorMsg }}</div>
+              <NewLoadTab
+                v-if="activeTab === 'new-load'"
+                :customers="customers"
+                :dispatchers="users.filter((user) => user.role === 'DISPATCHER')"
+                :current-user-name="currentUser?.name ?? ''"
+                @load-created="refreshData"
+              />
+              <AvailableLoadsTab
+                v-else-if="activeTab === 'available'"
+                :loads="loads"
+                :greenbush="greenbush"
+                :can-book="canBook"
+                :can-quote="canQuoteLoads"
+                :can-quote-greenbush="canQuoteGreenbush"
+                :role="role"
+                @book="bookPrompt"
+                @quote="quotePrompt"
+                @quote-greenbush="greenbushQuotePrompt"
+                @save-specs="saveSpecsAction"
+              />
+              <MyLoadsTab
+                v-else-if="activeTab === 'my-loads'"
+                :loads="loads"
+                :user="currentUser"
+                :can-decide="canDecide"
+                :can-update-status="canUpdateStatus"
+                @decide-load="decisionAction"
+                @set-status="statusPrompt"
+                @save-specs="saveSpecsAction"
+              />
+              <AllLoadsTab
+                v-else-if="activeTab === 'all-loads'"
+                :loads="loads"
+                :customers="customers"
+                :users="users"
+                :can-edit="canEditLoads"
+                :current-user="currentUser"
+              />
+              <CustomersTab
+                v-else-if="activeTab === 'customers'"
+                :customers="customers"
+                :can-manage="canManageCustomers"
+                @create="createCustomerAction"
+                @update="updateCustomerAction"
+                @delete="deleteCustomerAction"
+              />
+              <UsersTab
+                v-else-if="activeTab === 'users'"
+                :users="users"
+                :can-manage="canManageUsers"
+                :current-user-id="currentUser?.sub ?? ''"
+                @create="createUserAction"
+                @update="updateUserAction"
+                @delete="deleteUserAction"
+                @ban="banUserAction"
+              />
+              <GreenbushTab
+                v-else-if="activeTab === 'greenbush'"
+                :rows="greenbush"
+                :can-manage="canManageGreenbush"
+                :can-quote="canQuoteGreenbush"
+                @open-quote="greenbushQuotePrompt"
+                @create="createGreenbushAction"
+                @update="updateGreenbushAction"
+                @delete="deleteGreenbushAction"
+                @increment="incrementGreenbushAction"
+                @bulk-replace="bulkReplaceGreenbushAction"
+              />
+              <ReportsTab v-else />
+            </template>
+          </div>
         </section>
       </main>
+    </div>
+
+    <div v-if="showBookModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="w-full max-w-md rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-bold">Book Load</h4>
+          <button type="button" class="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeBookModal">X</button>
+        </div>
+        <div class="mt-3 space-y-3">
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Truck Number
+            <input
+              v-model="bookModal.truckNumber"
+              type="text"
+              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Driver Name
+            <input
+              v-model="bookModal.driverName"
+              type="text"
+              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeBookModal">Cancel</button>
+          <button type="button" class="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800" @click="submitBookModal">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showQuoteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="w-full max-w-md rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-bold">Submit Quote</h4>
+          <button type="button" class="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeQuoteModal">X</button>
+        </div>
+        <div class="mt-3 space-y-3">
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Requested Pickup Date
+            <input
+              v-model="quoteModal.pickupDate"
+              type="date"
+              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeQuoteModal">Cancel</button>
+          <button type="button" class="rounded bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800" @click="submitQuoteModal">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showGreenbushQuoteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="w-full max-w-md rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-bold">Submit Greenbush Quote</h4>
+          <button type="button" class="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeGreenbushQuoteModal">X</button>
+        </div>
+        <div class="mt-3 space-y-3">
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Pickup Date
+            <input
+              v-model="greenbushQuoteModal.pickupDate"
+              type="date"
+              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Truck Number
+            <input
+              v-model="greenbushQuoteModal.truckNumber"
+              type="text"
+              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
+          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            Driver Name (Optional)
+            <input
+              v-model="greenbushQuoteModal.driverName"
+              type="text"
+              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            />
+          </label>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeGreenbushQuoteModal">Cancel</button>
+          <button type="button" class="rounded bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800" @click="submitGreenbushQuoteModal">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pointer-events-none fixed right-4 top-4 z-50 space-y-2">
+      <div
+        v-for="toast in ui.toasts"
+        :key="toast.id"
+        class="pointer-events-auto rounded-lg px-3 py-2 text-sm font-semibold text-white shadow"
+        :class="toastClass(toast.type)"
+      >
+        {{ toast.message }}
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, provide, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
+
 import {
-  banUser, bookLoad, bulkReplaceGreenbush, createCustomer, createGreenbush, createLoad, createUser, decideLoad,
-  deleteCustomer, deleteUser, getInitialData, incrementGreenbush, quoteGreenbush, quoteLoad, updateCustomer, updateGreenbush,
-  updateLoad, updateLoadStatus, updateUser, type GreenbushMutationPayload,
+  banUser,
+  bookLoad,
+  bulkReplaceGreenbush,
+  createCustomer,
+  createGreenbush,
+  createUser,
+  decideLoad,
+  deleteCustomer,
+  deleteGreenbush,
+  deleteUser,
+  getInitialData,
+  incrementGreenbush,
+  quoteGreenbush,
+  quoteLoad,
+  updateCustomer,
+  updateGreenbush,
+  updateLoad,
+  updateLoadStatus,
+  updateUser,
+  type GreenbushMutationPayload,
 } from '@/api/freight';
 import { useAuthStore } from '@/stores/auth';
-import { useUiStore } from '@/stores/ui';
-import type { LoadRecord, SessionUser, UserRecord } from '@/types/models';
+import { useUiStore, type ToastType } from '@/stores/ui';
+import type { SessionUser, UserRecord } from '@/types/models';
 import AllLoadsTab from './dashboard/AllLoadsTab.vue';
 import AvailableLoadsTab from './dashboard/AvailableLoadsTab.vue';
 import CustomersTab from './dashboard/CustomersTab.vue';
 import GreenbushTab from './dashboard/GreenbushTab.vue';
 import MyLoadsTab from './dashboard/MyLoadsTab.vue';
+import NewLoadTab from './dashboard/NewLoadTab.vue';
+import {
+  BarChart3,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
+  Leaf,
+  List,
+  LogOut,
+  Moon,
+  Package,
+  Plus,
+  Settings,
+  Sun,
+  Users,
+} from 'lucide-vue-next';
 import ReportsTab from './dashboard/ReportsTab.vue';
 import UsersTab from './dashboard/UsersTab.vue';
 
-type TabId = 'available' | 'my-loads' | 'all-loads' | 'customers' | 'users' | 'greenbush' | 'reports';
-const router = useRouter(); const queryClient = useQueryClient(); const auth = useAuthStore(); const ui = useUiStore();
-const activeTab = ref<TabId>('available'); const busy = ref(false); const errorMsg = ref('');
-const query = useQuery({ queryKey: ['initial-data'], queryFn: () => getInitialData(), refetchInterval: 10000 });
-watch(() => query.data.value?.currentUser, (v) => { if (v) auth.user = v; }, { immediate: true });
-const currentUser = computed<SessionUser | null>(() => query.data.value?.currentUser ?? auth.user);
-const loads = computed(() => query.data.value?.loads ?? []); const customers = computed(() => query.data.value?.customers ?? []);
-const users = computed<UserRecord[]>(() => query.data.value?.users ?? []); const greenbush = computed(() => query.data.value?.greenbush ?? []);
-const role = computed(() => currentUser.value?.role ?? 'VIEWER');
-const canCreateLoad = computed(() => ['ACCOUNT_MANAGER', 'MANAGER', 'ADMIN'].includes(role.value));
-const canBook = computed(() => ['DISPATCHER', 'MANAGER', 'ADMIN'].includes(role.value));
-const canQuoteLoads = computed(() => canBook.value); const canDecide = computed(() => ['MANAGER', 'ADMIN'].includes(role.value));
-const canEditLoads = computed(() => ['ACCOUNT_MANAGER', 'MANAGER', 'ADMIN'].includes(role.value));
-const canManageCustomers = computed(() => ['ACCOUNT_MANAGER', 'MANAGER', 'ADMIN'].includes(role.value));
-const canManageUsers = computed(() => ['MANAGER', 'ADMIN'].includes(role.value));
-const canManageGreenbush = computed(() => ['MANAGER', 'ADMIN'].includes(role.value));
-const pendingBadge = computed(() => loads.value.filter((l) => l.status === 'PENDING_APPROVAL' || l.status === 'QUOTE_SUBMITTED').length);
-const navItems = computed(() => {
-  const items: Array<{ id: TabId; label: string; icon: string; badge?: number }> = [
-    { id: 'available', label: 'Available', icon: 'AV' }, { id: 'my-loads', label: 'My Loads', icon: 'MY', badge: pendingBadge.value },
-    { id: 'all-loads', label: 'All Loads', icon: 'AL' }, { id: 'customers', label: 'Customers', icon: 'CU' },
-    { id: 'greenbush', label: 'Greenbush', icon: 'GB' }, { id: 'reports', label: 'Reports', icon: 'RP' },
-  ]; if (canManageUsers.value) items.splice(4, 0, { id: 'users', label: 'Users', icon: 'US' }); return items;
+type TabId = 'new-load' | 'available' | 'my-loads' | 'all-loads' | 'customers' | 'users' | 'greenbush' | 'reports';
+
+const router = useRouter();
+const queryClient = useQueryClient();
+const auth = useAuthStore();
+const ui = useUiStore();
+
+const activeTab = ref<TabId>('available');
+const busy = ref(false);
+const errorMsg = ref('');
+const showBookModal = ref(false);
+const showQuoteModal = ref(false);
+const showGreenbushQuoteModal = ref(false);
+
+const bookModal = reactive({
+  loadId: '',
+  truckNumber: '',
+  driverName: '',
 });
-watch(navItems, (items) => { if (!items.some((i) => i.id === activeTab.value)) activeTab.value = items[0]?.id ?? 'available'; });
-const quickLoadForm = reactive({ customerId: '', loadRefNumber: '', puCity: '', puState: '', delCity: '', delState: '', rate: 0, miles: 0 });
-async function run(task: () => Promise<void>): Promise<void> { busy.value = true; errorMsg.value = ''; try { await task(); await queryClient.invalidateQueries({ queryKey: ['initial-data'] }); } catch (e) { errorMsg.value = e instanceof Error ? e.message : 'Unexpected error'; } finally { busy.value = false; } }
-async function submitQuickLoad(): Promise<void> { if (!canCreateLoad.value) return; await run(async () => { await createLoad({ customerId: quickLoadForm.customerId, loadRefNumber: quickLoadForm.loadRefNumber.trim(), puCity: quickLoadForm.puCity.trim(), puState: quickLoadForm.puState.trim().toUpperCase(), delCity: quickLoadForm.delCity.trim(), delState: quickLoadForm.delState.trim().toUpperCase(), rate: Number(quickLoadForm.rate), miles: Number(quickLoadForm.miles) }); quickLoadForm.customerId = ''; quickLoadForm.loadRefNumber = ''; quickLoadForm.puCity = ''; quickLoadForm.puState = ''; quickLoadForm.delCity = ''; quickLoadForm.delState = ''; quickLoadForm.rate = 0; quickLoadForm.miles = 0; }); }
-async function bookPrompt(loadId: string): Promise<void> { const truckNumber = window.prompt('Truck number?'); if (!truckNumber) return; const driverName = window.prompt('Driver name?'); if (!driverName) return; await run(async () => { await bookLoad({ loadId, truckNumber, driverName }); }); }
-async function quotePrompt(loadId: string): Promise<void> { const pickupDate = window.prompt('Requested pickup date (YYYY-MM-DD)?', new Date().toISOString().slice(0, 10)); if (!pickupDate) return; await run(async () => { await quoteLoad({ loadId, pickupDate }); }); }
-async function decisionPrompt(loadId: string, decision: 'accept' | 'deny'): Promise<void> {
-  const load = loads.value.find((row) => row.id === loadId); if (!load) return;
-  const notes = window.prompt('Decision notes?', decision === 'accept' ? 'Approved' : 'Denied') ?? undefined;
-  const requestedPickupDate = window.prompt('Requested pickup date (optional)', load.requested_pickup_date ?? load.pu_date ?? '') || undefined;
-  const newDeliveryDate = decision === 'accept' && load.status === 'QUOTE_SUBMITTED' ? (window.prompt('New delivery date (required for quote accept)', load.del_date ?? '') || undefined) : undefined;
-  const loadRefNumber = window.prompt('Load Ref # (optional)', load.load_ref_number) || undefined;
-  const mcleodOrderId = window.prompt('McLeod Order ID (optional)', load.mcleod_order_id ?? '') || undefined;
-  await run(async () => { await decideLoad({ loadId, decision, notes, requestedPickupDate, newDeliveryDate, loadRefNumber, mcleodOrderId }); });
+
+const quoteModal = reactive({
+  loadId: '',
+  pickupDate: '',
+});
+
+const greenbushQuoteModal = reactive({
+  greenbushId: '',
+  pickupDate: '',
+  truckNumber: '',
+  driverName: '',
+});
+
+const currentUser = computed<SessionUser | null>(() => auth.user);
+const role = computed(() => currentUser.value?.role ?? 'VIEWER');
+
+const query = useQuery({
+  queryKey: ['initial-data'],
+  queryFn: () => getInitialData(),
+  refetchInterval: () => {
+    if (activeTab.value === 'available') {
+      return role.value === 'VIEWER' ? 60000 : 30000;
+    }
+    return 10000;
+  },
+});
+
+watch(
+  () => query.data.value?.currentUser,
+  (value) => {
+    if (value) {
+      auth.user = value;
+    }
+  },
+  { immediate: true },
+);
+
+const loads = computed(() => query.data.value?.loads ?? []);
+const customers = computed(() => query.data.value?.customers ?? []);
+const users = computed<UserRecord[]>(() => query.data.value?.users ?? []);
+const greenbush = computed(() => query.data.value?.greenbush ?? []);
+
+const isAdminLike = computed(() => role.value === 'ADMIN' || role.value === 'MANAGER');
+const isAccountManager = computed(() => role.value === 'ACCOUNT_MANAGER');
+const accountManagerHasFullAccess = computed(() => Boolean(currentUser.value?.full_load_access));
+
+const canCreateLoad = computed(() => isAdminLike.value || isAccountManager.value);
+const canBook = computed(() => isAdminLike.value || role.value === 'DISPATCHER');
+const canQuoteLoads = computed(() => canBook.value);
+const canQuoteGreenbush = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
+const canDecide = computed(() => isAdminLike.value || isAccountManager.value);
+const canUpdateStatus = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
+const canEditLoads = computed(() => isAdminLike.value || isAccountManager.value);
+const canManageCustomers = computed(() => isAdminLike.value || (isAccountManager.value && accountManagerHasFullAccess.value));
+const canManageUsers = computed(() => isAdminLike.value);
+const canManageGreenbush = computed(() => isAdminLike.value);
+const canViewCustomersTab = computed(() => canManageCustomers.value);
+const canViewUsersTab = computed(() => canManageUsers.value);
+const canViewGreenbushTab = computed(() => canManageGreenbush.value);
+const canViewReportsTab = computed(() => isAdminLike.value || isAccountManager.value);
+const canViewAllLoadsTab = computed(() => isAdminLike.value || isAccountManager.value);
+const canViewMyLoadsTab = computed(() => role.value === 'DISPATCHER' || isAdminLike.value || isAccountManager.value);
+const canViewNewLoadTab = computed(() => canCreateLoad.value);
+
+const pendingBadge = computed(() =>
+  loads.value.filter((load) => load.status === 'PENDING_APPROVAL' || load.status === 'QUOTE_SUBMITTED').length,
+);
+
+const navItems = computed(() => {
+  const items: Array<{ id: TabId; label: string; icon: any; badge?: number }> = [];
+
+  if (canViewNewLoadTab.value) {
+    items.push({ id: 'new-load', label: 'New Load', icon: Plus });
+  }
+  items.push({ id: 'available', label: 'Available', icon: Package });
+  if (canViewMyLoadsTab.value) {
+    items.push({ id: 'my-loads', label: 'My Loads', icon: Briefcase, badge: pendingBadge.value });
+  }
+  if (canViewAllLoadsTab.value) {
+    items.push({ id: 'all-loads', label: 'All Loads', icon: List });
+  }
+  if (canViewCustomersTab.value) {
+    items.push({ id: 'customers', label: 'Customers', icon: Users });
+  }
+  if (canViewUsersTab.value) {
+    items.push({ id: 'users', label: 'Settings', icon: Settings });
+  }
+  if (canViewGreenbushTab.value) {
+    items.push({ id: 'greenbush', label: 'Greenbush', icon: Leaf });
+  }
+  if (canViewReportsTab.value) {
+    items.push({ id: 'reports', label: 'Reports', icon: BarChart3 });
+  }
+
+  return items;
+});
+
+watch(navItems, (items) => {
+  if (!items.some((item) => item.id === activeTab.value)) {
+    activeTab.value = items[0]?.id ?? 'available';
+  }
+});
+
+function showToast(message: string, type: ToastType): void {
+  ui.showToast(message, type);
 }
-async function statusPrompt(loadId: string, status: 'LOADED' | 'DELIVERED' | 'DELAYED' | 'CANCELED'): Promise<void> {
-  const reason = status === 'DELAYED' || status === 'CANCELED' ? (window.prompt(`${status} reason`) || undefined) : undefined;
-  await run(async () => { await updateLoadStatus(loadId, status, reason); });
+
+provide('showToast', showToast);
+
+async function refreshData(): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: ['initial-data'] });
 }
-async function editLoadPrompt(loadId: string): Promise<void> {
-  const load = loads.value.find((row) => row.id === loadId); if (!load) return;
-  const payloadText = window.prompt('Edit JSON payload for PATCH /loads/:id', JSON.stringify({ customerId: load.customer_id, accountManagerId: load.account_manager_id, assignedDispatcherId: load.assigned_dispatcher_id, status: load.status, loadRefNumber: load.load_ref_number, mcleodOrderId: load.mcleod_order_id, requestedPickupDate: load.requested_pickup_date, puDate: load.pu_date, delDate: load.del_date, rate: Number(load.rate), miles: Number(load.miles), truckNumber: load.truck_number, driverName: load.driver_name, equipment: load.equipment, notes: load.notes, otherNotes: load.other_notes }, null, 2));
-  if (!payloadText) return; let payload: unknown; try { payload = JSON.parse(payloadText); } catch { window.alert('Invalid JSON payload'); return; }
-  await run(async () => { await updateLoad(loadId, payload as Record<string, unknown>); });
+
+async function run(task: () => Promise<void>, successMessage?: string): Promise<void> {
+  busy.value = true;
+  errorMsg.value = '';
+  try {
+    await task();
+    if (successMessage) {
+      ui.showToast(successMessage, 'success');
+    }
+    await refreshData();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unexpected error';
+    errorMsg.value = message;
+    ui.showToast(message, 'error');
+  } finally {
+    busy.value = false;
+  }
 }
-async function greenbushQuotePrompt(rowId: string): Promise<void> { const pickupDate = window.prompt('Pickup date (YYYY-MM-DD)?', new Date().toISOString().slice(0, 10)); if (!pickupDate) return; const truckNumber = window.prompt('Truck number?'); if (!truckNumber) return; const driverName = window.prompt('Driver name (optional)') || undefined; await run(async () => { await quoteGreenbush({ greenbushId: rowId, pickupDate, truckNumber, driverName }); }); }
-async function createCustomerAction(payload: { name: string; type: 'Direct Customer' | 'Broker'; quoteAccept: boolean }): Promise<void> { await run(async () => { await createCustomer(payload); }); }
-async function updateCustomerAction(payload: { id: string; data: { name: string; type: 'Direct Customer' | 'Broker'; quoteAccept: boolean } }): Promise<void> { await run(async () => { await updateCustomer(payload.id, payload.data); }); }
-async function deleteCustomerAction(id: string): Promise<void> { await run(async () => { await deleteCustomer(id); }); }
-async function createUserAction(payload: { email: string; name: string; role: UserRecord['role'] }): Promise<void> { await run(async () => { await createUser(payload); }); }
-async function updateUserAction(payload: { id: string; data: { email: string; name: string; role: UserRecord['role'] } }): Promise<void> { await run(async () => { await updateUser(payload.id, payload.data); }); }
-async function deleteUserAction(id: string): Promise<void> { await run(async () => { await deleteUser(id); }); }
-async function banUserAction(id: string): Promise<void> { await run(async () => { await banUser(id); }); }
-async function createGreenbushAction(payload: GreenbushMutationPayload): Promise<void> { await run(async () => { await createGreenbush(payload); }); }
-async function updateGreenbushAction(payload: { id: string; data: GreenbushMutationPayload }): Promise<void> { await run(async () => { await updateGreenbush(payload.id, payload.data); }); }
-async function incrementGreenbushAction(id: string): Promise<void> { await run(async () => { await incrementGreenbush(id); }); }
-async function bulkReplaceGreenbushAction(rows: GreenbushMutationPayload[]): Promise<void> { await run(async () => { await bulkReplaceGreenbush(rows); }); }
-function roleLabel(value: string | undefined): string { if (!value) return 'Unknown Role'; return value.split('_').map((s) => `${s[0]}${s.slice(1).toLowerCase()}`).join(' '); }
-async function handleLogout(): Promise<void> { await auth.logoutSession(); await router.push({ name: 'login' }); }
-if (!auth.user) void auth.refreshSession();
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function bookPrompt(loadId: string): void {
+  bookModal.loadId = loadId;
+  bookModal.truckNumber = '';
+  bookModal.driverName = '';
+  showBookModal.value = true;
+}
+
+function closeBookModal(): void {
+  showBookModal.value = false;
+  bookModal.loadId = '';
+  bookModal.truckNumber = '';
+  bookModal.driverName = '';
+}
+
+async function submitBookModal(): Promise<void> {
+  const loadId = bookModal.loadId;
+  const truckNumber = bookModal.truckNumber.trim();
+  const driverName = bookModal.driverName.trim();
+
+  if (!loadId || !truckNumber || !driverName) {
+    ui.showToast('Truck number and driver name are required.', 'error');
+    return;
+  }
+
+  await run(async () => {
+    await bookLoad({ loadId, truckNumber, driverName });
+  }, 'Booking submitted for review');
+
+  closeBookModal();
+}
+
+function quotePrompt(loadId: string): void {
+  quoteModal.loadId = loadId;
+  quoteModal.pickupDate = todayIsoDate();
+  showQuoteModal.value = true;
+}
+
+function closeQuoteModal(): void {
+  showQuoteModal.value = false;
+  quoteModal.loadId = '';
+  quoteModal.pickupDate = '';
+}
+
+async function submitQuoteModal(): Promise<void> {
+  const loadId = quoteModal.loadId;
+  const pickupDate = quoteModal.pickupDate.trim();
+
+  if (!loadId || !pickupDate) {
+    ui.showToast('Pickup date is required.', 'error');
+    return;
+  }
+
+  await run(async () => {
+    await quoteLoad({ loadId, pickupDate });
+  }, 'Quote submitted');
+
+  closeQuoteModal();
+}
+
+async function decisionAction(payload: {
+  loadId: string;
+  decision: 'accept' | 'deny';
+  requestedPickupDate?: string;
+  newDeliveryDate?: string;
+  loadRefNumber?: string;
+  mcleodOrderId?: string;
+  denyReason?: string;
+}): Promise<void> {
+  await run(async () => {
+    await decideLoad(payload);
+  }, payload.decision === 'accept' ? 'Load accepted' : 'Load denied');
+}
+
+async function statusPrompt(payload: {
+  loadId: string;
+  status: 'LOADED' | 'DELIVERED' | 'DELAYED' | 'CANCELED' | 'TONU';
+  reason?: string;
+}): Promise<void> {
+  await run(async () => {
+    await updateLoadStatus(payload.loadId, payload.status, payload.reason);
+  }, `Status updated to ${payload.status}`);
+}
+
+async function saveSpecsAction(payload: { loadId: string; notes: string }): Promise<void> {
+  await run(async () => {
+    await updateLoad(payload.loadId, {
+      notes: payload.notes.trim() || null,
+    });
+  }, 'Specs updated');
+}
+
+function greenbushQuotePrompt(rowId: string): void {
+  greenbushQuoteModal.greenbushId = rowId;
+  greenbushQuoteModal.pickupDate = todayIsoDate();
+  greenbushQuoteModal.truckNumber = '';
+  greenbushQuoteModal.driverName = '';
+  showGreenbushQuoteModal.value = true;
+}
+
+function closeGreenbushQuoteModal(): void {
+  showGreenbushQuoteModal.value = false;
+  greenbushQuoteModal.greenbushId = '';
+  greenbushQuoteModal.pickupDate = '';
+  greenbushQuoteModal.truckNumber = '';
+  greenbushQuoteModal.driverName = '';
+}
+
+async function submitGreenbushQuoteModal(): Promise<void> {
+  const greenbushId = greenbushQuoteModal.greenbushId;
+  const pickupDate = greenbushQuoteModal.pickupDate.trim();
+  const truckNumber = greenbushQuoteModal.truckNumber.trim();
+  const driverName = greenbushQuoteModal.driverName.trim() || undefined;
+
+  if (!greenbushId || !pickupDate || !truckNumber) {
+    ui.showToast('Pickup date and truck number are required.', 'error');
+    return;
+  }
+
+  await run(async () => {
+    await quoteGreenbush({ greenbushId, pickupDate, truckNumber, driverName });
+  }, 'Greenbush quote submitted');
+
+  closeGreenbushQuoteModal();
+}
+
+async function createCustomerAction(payload: {
+  name: string;
+  type: 'Direct Customer' | 'Broker';
+  quoteAccept: boolean;
+}): Promise<void> {
+  await run(async () => {
+    await createCustomer(payload);
+  }, 'Customer created');
+}
+
+async function updateCustomerAction(payload: {
+  id: string;
+  data: { name: string; type: 'Direct Customer' | 'Broker'; quoteAccept: boolean };
+}): Promise<void> {
+  await run(async () => {
+    await updateCustomer(payload.id, payload.data);
+  }, 'Customer updated');
+}
+
+async function deleteCustomerAction(id: string): Promise<void> {
+  await run(async () => {
+    await deleteCustomer(id);
+  }, 'Customer deleted');
+}
+
+async function createUserAction(payload: {
+  email: string;
+  name: string;
+  role: UserRecord['role'];
+  fullLoadAccess?: boolean;
+}): Promise<void> {
+  await run(async () => {
+    await createUser(payload);
+  }, 'User created');
+}
+
+async function updateUserAction(payload: {
+  id: string;
+  data: { email: string; name: string; role: UserRecord['role']; fullLoadAccess?: boolean };
+}): Promise<void> {
+  await run(async () => {
+    await updateUser(payload.id, payload.data);
+  }, 'User updated');
+}
+
+async function deleteUserAction(id: string): Promise<void> {
+  await run(async () => {
+    await deleteUser(id);
+  }, 'User deleted');
+}
+
+async function banUserAction(id: string): Promise<void> {
+  await run(async () => {
+    await banUser(id);
+  }, 'User banned');
+}
+
+async function createGreenbushAction(payload: GreenbushMutationPayload): Promise<void> {
+  await run(async () => {
+    await createGreenbush(payload);
+  }, 'Greenbush row created');
+}
+
+async function updateGreenbushAction(payload: { id: string; data: GreenbushMutationPayload }): Promise<void> {
+  await run(async () => {
+    await updateGreenbush(payload.id, payload.data);
+  }, 'Greenbush row updated');
+}
+
+async function deleteGreenbushAction(id: string): Promise<void> {
+  await run(async () => {
+    await deleteGreenbush(id);
+  }, 'Greenbush row deleted');
+}
+
+async function incrementGreenbushAction(id: string): Promise<void> {
+  await run(async () => {
+    await incrementGreenbush(id);
+  }, 'Greenbush inventory increased');
+}
+
+async function bulkReplaceGreenbushAction(rows: GreenbushMutationPayload[]): Promise<void> {
+  await run(async () => {
+    await bulkReplaceGreenbush(rows);
+  }, 'Greenbush pool replaced');
+}
+
+function roleLabel(value: string | undefined): string {
+  if (!value) return 'Unknown Role';
+  return value
+    .split('_')
+    .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+    .join(' ');
+}
+
+function toastClass(type: ToastType): string {
+  switch (type) {
+    case 'success':
+      return 'bg-emerald-700';
+    case 'error':
+      return 'bg-rose-700';
+    case 'warning':
+      return 'bg-amber-600';
+    default:
+      return 'bg-blue-700';
+  }
+}
+
+async function handleLogout(): Promise<void> {
+  await auth.logoutSession();
+  window.location.href = '/apps/hub/login';
+}
+
+if (!auth.user) {
+  void auth.refreshSession();
+}
 </script>

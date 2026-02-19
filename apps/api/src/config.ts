@@ -23,14 +23,12 @@ function parseCompanyDomains(raw: string | undefined): string[] {
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 8787),
+  apiBasePath: process.env.API_BASE_PATH ?? '/api/customer-freight',
+  logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
   appUrl: process.env.APP_URL ?? 'http://localhost:5174',
   apiUrl: process.env.API_URL ?? 'http://localhost:8787',
-  jwtSecret: process.env.JWT_SECRET ?? 'dev-jwt-secret-change-me',
-  cookieDomain: process.env.COOKIE_DOMAIN ?? 'localhost',
-  googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
-  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-  googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:8787/api/auth/google/callback',
   companyDomains: parseCompanyDomains(process.env.COMPANY_DOMAINS),
 } as const;
 
-export const SESSION_COOKIE_NAME = 'cfa_session';
+export const ACCESS_PERMISSION = 'customer-freight:access';
+export const ADMIN_PERMISSION = 'customer-freight:admin';

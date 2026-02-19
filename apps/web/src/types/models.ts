@@ -5,6 +5,7 @@ export interface SessionUser {
   email: string;
   role: UserRole;
   name: string;
+  full_load_access: boolean;
 }
 
 export interface LoadRecord {
@@ -64,6 +65,7 @@ export interface UserRecord {
   email: string;
   name: string;
   role: UserRole;
+  full_load_access: boolean;
 }
 
 export interface GreenbushRecord {
@@ -75,9 +77,18 @@ export interface GreenbushRecord {
   price: string;
   tarp: string | null;
   remaining_count: number;
+  reserved_count: number;
   special_notes: string | null;
 }
 
 export interface ApiEnvelope<T> {
+  success: true;
   data: T;
+  warning?: string;
+}
+
+export interface ApiErrorEnvelope {
+  success: false;
+  error: string;
+  message: string;
 }
