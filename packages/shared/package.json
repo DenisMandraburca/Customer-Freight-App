@@ -15,5 +15,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "echo \"No tests in @antigravity/shared\"",
     "lint": "echo \"No lint configured for @antigravity/shared\""
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
 }

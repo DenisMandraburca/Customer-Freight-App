@@ -158,7 +158,10 @@ function createPrismaClient(): PrismaClient {
         ? `${databaseUrl}${databaseUrl.includes('?') ? '&' : '?'}sslmode=require`
         : databaseUrl;
 
-  const adapter = new PrismaPg({ connectionString });
+  const adapter = new PrismaPg({
+    connectionString,
+    ...(typeof ssl === 'object' && ssl !== null && { ssl }),
+  });
   return new PrismaClient({ adapter });
 }
 
