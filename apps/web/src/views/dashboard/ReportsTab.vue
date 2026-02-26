@@ -41,10 +41,8 @@
       <ReportCard
         title="Executive KPI Overview"
         subtitle="Core operational health metrics"
-        can-export-png
         @open-info="openInfo('kpi')"
         @export-csv="exportReportCsv('kpi', kpiColumns, sortedKpiRows)"
-        @export-png="exportChartPng('kpi', kpiChartRef)"
       >
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-5">
           <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 dark:border-zinc-800 dark:bg-zinc-950/60">
@@ -57,7 +55,7 @@
           </div>
           <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 dark:border-zinc-800 dark:bg-zinc-950/60">
             <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Revenue</div>
-            <div class="mt-1 text-lg font-black text-zinc-800 dark:text-zinc-100">{{ formatCurrencyValue(kpiMetrics.revenue) }}</div>
+            <div class="mt-1 text-lg font-black text-zinc-800 dark:text-zinc-100">{{ formatCurrencyWhole(kpiMetrics.revenue) }}</div>
           </div>
           <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 dark:border-zinc-800 dark:bg-zinc-950/60">
             <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">Avg RPM</div>
@@ -69,7 +67,7 @@
           </div>
         </div>
 
-        <VChart ref="kpiChartRef" class="mt-3 h-64 w-full" :option="kpiChartOption" autoresize />
+        <VChart class="mt-3 h-64 w-full" :option="kpiChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -95,12 +93,10 @@
       <ReportCard
         title="Load Volume Trend"
         subtitle="Load count by status and period"
-        can-export-png
         @open-info="openInfo('volume')"
         @export-csv="exportReportCsv('volume', volumeColumns, sortedVolumeRows)"
-        @export-png="exportChartPng('volume', volumeChartRef)"
       >
-        <VChart ref="volumeChartRef" class="h-64 w-full" :option="volumeChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="volumeChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -126,12 +122,10 @@
       <ReportCard
         title="Revenue and RPM Trend"
         subtitle="Revenue and RPM over time"
-        can-export-png
         @open-info="openInfo('revenue')"
         @export-csv="exportReportCsv('revenue', revenueColumns, sortedRevenueRows)"
-        @export-png="exportChartPng('revenue', revenueChartRef)"
       >
-        <VChart ref="revenueChartRef" class="h-64 w-full" :option="revenueChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="revenueChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -157,10 +151,8 @@
       <ReportCard
         title="Status Pipeline by Account Manager"
         subtitle="Stacked status distribution by manager"
-        can-export-png
         @open-info="openInfo('pipeline')"
         @export-csv="exportReportCsv('pipeline', pipelineColumns, sortedPipelineRows)"
-        @export-png="exportChartPng('pipeline', pipelineChartRef)"
       >
         <div class="mb-2 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
           <span>Top AMs in chart</span>
@@ -174,7 +166,7 @@
           </select>
         </div>
 
-        <VChart ref="pipelineChartRef" class="h-64 w-full" :option="pipelineChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="pipelineChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -200,10 +192,8 @@
       <ReportCard
         title="Customer Performance Leaderboard"
         subtitle="Ranking customers by output and quality"
-        can-export-png
         @open-info="openInfo('customer')"
         @export-csv="exportReportCsv('customer', customerColumns, sortedCustomerRows)"
-        @export-png="exportChartPng('customer', customerChartRef)"
       >
         <div class="mb-2 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
           <span>Top customers in chart</span>
@@ -217,7 +207,7 @@
           </select>
         </div>
 
-        <VChart ref="customerChartRef" class="h-64 w-full" :option="customerChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="customerChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -243,10 +233,8 @@
       <ReportCard
         title="Account Manager Scorecard"
         subtitle="Performance scorecard by account manager"
-        can-export-png
         @open-info="openInfo('am')"
         @export-csv="exportReportCsv('am', accountManagerColumns, sortedAccountManagerRows)"
-        @export-png="exportChartPng('am', accountManagerChartRef)"
       >
         <div class="mb-2 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
           <span>Top AMs in chart</span>
@@ -260,7 +248,7 @@
           </select>
         </div>
 
-        <VChart ref="accountManagerChartRef" class="h-64 w-full" :option="accountManagerChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="accountManagerChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -286,10 +274,8 @@
       <ReportCard
         title="Lane Performance"
         subtitle="Top lanes by load count and rate quality"
-        can-export-png
         @open-info="openInfo('lane')"
         @export-csv="exportReportCsv('lane', laneColumns, sortedLaneRows)"
-        @export-png="exportChartPng('lane', laneChartRef)"
       >
         <div class="mb-2 flex items-center justify-end gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
           <span>Top lanes in chart</span>
@@ -303,7 +289,7 @@
           </select>
         </div>
 
-        <VChart ref="laneChartRef" class="h-64 w-full" :option="laneChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="laneChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -329,12 +315,39 @@
       <ReportCard
         title="Exception and Reason Analysis"
         subtitle="Delayed, canceled, and TONU records"
-        can-export-png
         @open-info="openInfo('exception')"
         @export-csv="exportReportCsv('exception', exceptionColumns, sortedExceptionRows)"
-        @export-png="exportChartPng('exception', exceptionChartRef)"
       >
-        <VChart ref="exceptionChartRef" class="h-64 w-full" :option="exceptionChartOption" autoresize />
+        <template #header-actions>
+          <div class="flex items-center overflow-hidden rounded border border-zinc-300 dark:border-zinc-700">
+            <button
+              type="button"
+              class="px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
+              :class="
+                exceptionChartView === 'account_manager'
+                  ? 'bg-zinc-700 text-white dark:bg-zinc-200 dark:text-zinc-900'
+                  : 'bg-white text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800'
+              "
+              @click="exceptionChartView = 'account_manager'"
+            >
+              By Account Manager
+            </button>
+            <button
+              type="button"
+              class="border-l border-zinc-300 px-2 py-1 text-[10px] font-bold uppercase tracking-widest dark:border-zinc-700"
+              :class="
+                exceptionChartView === 'dispatcher'
+                  ? 'bg-zinc-700 text-white dark:bg-zinc-200 dark:text-zinc-900'
+                  : 'bg-white text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800'
+              "
+              @click="exceptionChartView = 'dispatcher'"
+            >
+              By Dispatcher
+            </button>
+          </div>
+        </template>
+
+        <VChart class="h-64 w-full" :option="exceptionChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -364,12 +377,10 @@
       <ReportCard
         title="Aging Pipeline"
         subtitle="Open loads by age bucket"
-        can-export-png
         @open-info="openInfo('aging')"
         @export-csv="exportReportCsv('aging', agingColumns, sortedAgingRows)"
-        @export-png="exportChartPng('aging', agingChartRef)"
       >
-        <VChart ref="agingChartRef" class="h-64 w-full" :option="agingChartOption" autoresize />
+        <VChart class="h-64 w-full" :option="agingChartOption" autoresize />
 
         <div class="mt-3 flex justify-end">
           <button
@@ -437,11 +448,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch, type Ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { LOAD_STATUSES, type LoadStatus } from '@antigravity/shared';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
-import type { EChartsType } from 'echarts/core';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import VChart from 'vue-echarts';
@@ -451,7 +461,7 @@ import ReportCard from '@/components/reports/ReportCard.vue';
 import ReportInfoModal from '@/components/reports/ReportInfoModal.vue';
 import ReportsFilterBar from '@/components/reports/ReportsFilterBar.vue';
 import SortableReportTable from '@/components/reports/SortableReportTable.vue';
-import { downloadChartPng, downloadCsv } from '@/components/reports/reportExport';
+import { downloadCsv } from '@/components/reports/reportExport';
 import {
   EXCEPTION_STATUSES,
   OPEN_PIPELINE_STATUSES,
@@ -481,8 +491,6 @@ import {
 use([CanvasRenderer, PieChart, LineChart, BarChart, TooltipComponent, LegendComponent, GridComponent]);
 
 type ReportId = 'kpi' | 'volume' | 'revenue' | 'pipeline' | 'customer' | 'am' | 'lane' | 'exception' | 'aging' | 'ledger';
-
-type ChartRef = Ref<{ chart: EChartsType } | null>;
 
 const props = defineProps<{
   loads: LoadRecord[];
@@ -524,6 +532,34 @@ const accountManagerTopN = ref(10);
 const laneTopN = ref(10);
 const pipelineTopN = ref(12);
 const ledgerLimit = ref<'100' | '250' | 'all'>('100');
+const exceptionChartView = ref<'account_manager' | 'dispatcher'>('account_manager');
+
+const ACCOUNT_MANAGER_COLORS = [
+  '#2563eb',
+  '#f97316',
+  '#16a34a',
+  '#dc2626',
+  '#0891b2',
+  '#9333ea',
+  '#ca8a04',
+  '#0f766e',
+  '#be185d',
+  '#4f46e5',
+  '#65a30d',
+  '#b45309',
+  '#0ea5e9',
+  '#ef4444',
+  '#22c55e',
+  '#6366f1',
+  '#eab308',
+  '#14b8a6',
+  '#ec4899',
+  '#8b5cf6',
+  '#059669',
+  '#f59e0b',
+  '#0284c7',
+  '#84cc16',
+];
 
 const customerTypeByName = computed(() => {
   const map = new Map<string, string>();
@@ -702,9 +738,9 @@ const reportInfos: Record<ReportId, ReportInfoDefinition> = {
     title: 'Exception and Reason Analysis',
     what: 'This report focuses on delayed, canceled, and TONU loads with the reasons recorded for those exceptions.',
     logic:
-      'Only statuses DELAYED, CANCELED, and TONU are included. Reason is taken from delay reason, cancel reason, deny quote reason, then reason log fallback.',
+      'Only statuses DELAYED, CANCELED, and TONU are included. The chart groups exception order counts by Account Manager or Dispatcher. The details table keeps reason-level rows.',
     filters:
-      'Global filters affect which exceptions remain in scope and how they are grouped by date and reason.',
+      'Global filters affect which exceptions remain in scope and the owner counts shown in the chart.',
   },
   aging: {
     id: 'aging',
@@ -752,8 +788,29 @@ function exportReportCsv(reportId: ReportId, columns: ReportTableColumn[], rows:
   downloadCsv(reportId, columns, rows);
 }
 
-function exportChartPng(reportId: ReportId, chartRef: ChartRef): void {
-  downloadChartPng(reportId, chartRef.value?.chart ?? null);
+function buildDeterministicColorMap(values: string[]): Map<string, string> {
+  const unique = [...new Set(values)].sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+  const map = new Map<string, string>();
+
+  unique.forEach((value, index) => {
+    map.set(value, ACCOUNT_MANAGER_COLORS[index % ACCOUNT_MANAGER_COLORS.length]);
+  });
+
+  return map;
+}
+
+function compareRevenueThenNameDesc(left: ReportTableRow, right: ReportTableRow, nameKey: string): number {
+  const revenueDiff = toNumber(right.revenue) - toNumber(left.revenue);
+  if (revenueDiff !== 0) {
+    return revenueDiff;
+  }
+
+  return String(right[nameKey] ?? '').localeCompare(String(left[nameKey] ?? ''), undefined, { sensitivity: 'base' });
+}
+
+function statusLabelWithLoads(status: LoadStatus): string {
+  const lower = formatStatusLabel(status).toLowerCase();
+  return `${lower.charAt(0).toUpperCase()}${lower.slice(1)} loads`;
 }
 
 function statusBadge(status: string): string {
@@ -770,6 +827,10 @@ function statusBadge(status: string): string {
   }
 
   return 'rounded px-2 py-1 text-[10px] font-bold bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200';
+}
+
+function formatCurrencyWhole(value: number): string {
+  return `$${Math.round(toNumber(value)).toLocaleString()}`;
 }
 
 const kpiMetrics = computed(() => {
@@ -841,20 +902,45 @@ const statusDistribution = computed(() => {
   return [...grouped.entries()].sort((left, right) => right[1] - left[1]);
 });
 
+const statusRevenueMap = computed(() => {
+  const grouped = new Map<LoadStatus, number>();
+
+  for (const load of filteredLoads.value) {
+    grouped.set(load.status, (grouped.get(load.status) ?? 0) + toNumber(load.rate));
+  }
+
+  return grouped;
+});
+
 const kpiChartOption = computed(() => ({
-  tooltip: { trigger: 'item' },
-  legend: { type: 'scroll', top: 0 },
+  tooltip: {
+    trigger: 'item',
+    formatter: (params: any) => {
+      const status = String(params?.data?.status ?? '');
+      const count = toNumber(params?.value);
+      const revenue = toNumber(params?.data?.revenue);
+
+      return [
+        formatStatusLabel(status),
+        `Orders: ${formatNumberValue(count)}`,
+        `Revenue: ${formatCurrencyWhole(revenue)}`,
+      ].join('<br/>');
+    },
+  },
+  legend: { type: 'scroll', orient: 'vertical', left: 0, top: 'middle' },
   series: [
     {
       type: 'pie',
-      radius: ['38%', '70%'],
-      top: 24,
+      center: ['66%', '50%'],
+      radius: ['36%', '68%'],
       label: {
         formatter: '{b}: {d}%',
       },
       data: statusDistribution.value.map(([status, count]) => ({
+        status,
         name: formatStatusLabel(status),
         value: count,
+        revenue: statusRevenueMap.value.get(status) ?? 0,
       })),
     },
   ],
@@ -901,10 +987,21 @@ const sortedVolumeRows = computed(() => sortRows(volumeRows.value, sortStates.vo
 
 const volumeRowsForChart = computed(() => [...volumeRows.value].sort((left, right) => String(left.date).localeCompare(String(right.date))));
 
+const volumeLegendRows = computed(() => {
+  const labels = statusesPresent.value.map((status) => formatStatusLabel(status));
+  const splitAt = Math.ceil(labels.length / 2);
+  return [labels.slice(0, splitAt), labels.slice(splitAt)].filter((row) => row.length > 0);
+});
+
 const volumeChartOption = computed(() => ({
   tooltip: { trigger: 'axis' },
-  legend: { type: 'scroll', top: 0 },
-  grid: { top: 38, right: 18, left: 42, bottom: 30 },
+  legend: volumeLegendRows.value.map((legendRow, index) => ({
+    type: 'plain',
+    left: 'center',
+    bottom: index === 0 ? 26 : 6,
+    data: legendRow,
+  })),
+  grid: { top: 18, right: 18, left: 42, bottom: 86 },
   xAxis: {
     type: 'category',
     data: volumeRowsForChart.value.map((row) => formatGroupedDateKey(String(row.date), filters.value.dateGroupBy)),
@@ -954,7 +1051,17 @@ const sortedRevenueRows = computed(() => sortRows(revenueRows.value, sortStates.
 const revenueRowsForChart = computed(() => [...revenueRows.value].sort((left, right) => String(left.date).localeCompare(String(right.date))));
 
 const revenueChartOption = computed(() => ({
-  tooltip: { trigger: 'axis' },
+  tooltip: {
+    trigger: 'axis',
+    formatter: (params: any) => {
+      const items = Array.isArray(params) ? params : [params];
+      const axisLabel = String(items[0]?.axisValueLabel ?? items[0]?.axisValue ?? '');
+      const revenue = toNumber(items.find((item: any) => item.seriesName === 'Revenue')?.value);
+      const avgRpm = toNumber(items.find((item: any) => item.seriesName === 'Avg RPM')?.value);
+
+      return [axisLabel, `Revenue: ${formatCurrencyWhole(revenue)}`, `Avg RPM: ${formatCurrencyValue(avgRpm)}`].join('<br/>');
+    },
+  },
   legend: { top: 0 },
   grid: { top: 38, right: 36, left: 52, bottom: 30 },
   xAxis: {
@@ -1073,8 +1180,8 @@ const pipelineStatusesForChart = computed<LoadStatus[]>(() => {
 
 const pipelineChartOption = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  legend: { type: 'scroll', top: 0 },
-  grid: { top: 38, right: 18, left: 42, bottom: 44 },
+  legend: { type: 'scroll', orient: 'vertical', left: 0, top: 'middle' },
+  grid: { top: 20, right: 18, left: 170, bottom: 44 },
   xAxis: {
     type: 'category',
     axisLabel: { interval: 0, rotate: 25 },
@@ -1148,11 +1255,17 @@ const customerRows = computed<ReportTableRow[]>(() => {
   return [...grouped.values()];
 });
 
-const sortedCustomerRows = computed(() => sortRows(customerRows.value, sortStates.customer, defaultSorts.customer));
+const sortedCustomerRows = computed(() => {
+  if (sortStates.customer) {
+    return sortRows(customerRows.value, sortStates.customer, null);
+  }
+
+  return [...customerRows.value].sort((left, right) => compareRevenueThenNameDesc(left, right, 'customer'));
+});
 
 const customerRowsForChart = computed(() =>
   [...customerRows.value]
-    .sort((left, right) => toNumber(right.revenue) - toNumber(left.revenue))
+    .sort((left, right) => compareRevenueThenNameDesc(left, right, 'customer'))
     .slice(0, customerTopN.value),
 );
 
@@ -1167,6 +1280,7 @@ const customerChartOption = computed(() => ({
   },
   yAxis: {
     type: 'category',
+    inverse: true,
     data: customerRowsForChart.value.map((row) => String(row.customer)),
   },
   series: [
@@ -1243,9 +1357,45 @@ const accountManagerRowsForChart = computed(() =>
     .slice(0, accountManagerTopN.value),
 );
 
+const accountManagerChartLabels = computed(() => accountManagerRowsForChart.value.map((row) => String(row.account_manager)));
+const accountManagerColorMap = computed(() => buildDeterministicColorMap(accountManagerChartLabels.value));
+const accountManagerChartRowMap = computed(() => {
+  const map = new Map<string, ReportTableRow>();
+  for (const row of accountManagerRowsForChart.value) {
+    map.set(String(row.account_manager), row);
+  }
+  return map;
+});
+
 const accountManagerChartOption = computed(() => ({
-  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  grid: { top: 16, right: 20, left: 170, bottom: 24 },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: (params: any) => {
+      const items = Array.isArray(params) ? params : [params];
+      const selected = items.find((item: any) => toNumber(item.value) > 0) ?? items[0];
+      const dataIndex = Number(selected?.dataIndex ?? items[0]?.dataIndex ?? 0);
+      const manager = accountManagerChartLabels.value[dataIndex] ?? String(selected?.seriesName ?? '');
+      const row = accountManagerChartRowMap.value.get(manager);
+      const revenue = row ? toNumber(row.revenue) : toNumber(selected?.value);
+      const loadCount = row ? Math.max(toNumber(row.load_count), 1) : 1;
+      const avgRevenuePerLoad = revenue / loadCount;
+
+      return [
+        manager,
+        `Revenue: ${formatCurrencyWhole(revenue)}`,
+        `Avg Revenue per Load: ${formatCurrencyWhole(avgRevenuePerLoad)}`,
+      ].join('<br/>');
+    },
+  },
+  legend: {
+    type: 'scroll',
+    orient: 'vertical',
+    left: 0,
+    top: 'middle',
+    data: accountManagerChartLabels.value,
+  },
+  grid: { top: 16, right: 20, left: 220, bottom: 24 },
   xAxis: {
     type: 'value',
     axisLabel: {
@@ -1254,14 +1404,21 @@ const accountManagerChartOption = computed(() => ({
   },
   yAxis: {
     type: 'category',
-    data: accountManagerRowsForChart.value.map((row) => String(row.account_manager)),
+    data: accountManagerChartLabels.value,
   },
-  series: [
-    {
+  series: accountManagerRowsForChart.value.map((row, rowIndex) => {
+    const managerName = String(row.account_manager);
+    return {
+      name: managerName,
       type: 'bar',
-      data: accountManagerRowsForChart.value.map((row) => toNumber(row.revenue)),
-    },
-  ],
+      stack: 'manager_revenue',
+      barMaxWidth: 24,
+      itemStyle: {
+        color: accountManagerColorMap.value.get(managerName) ?? '#2563eb',
+      },
+      data: accountManagerRowsForChart.value.map((_innerRow, innerIndex) => (innerIndex === rowIndex ? toNumber(row.revenue) : 0)),
+    };
+  }),
 }));
 
 const laneColumns: ReportTableColumn[] = [
@@ -1281,8 +1438,10 @@ const laneRows = computed<ReportTableRow[]>(() => {
     const row = grouped.get(lane) ?? {
       id: lane,
       lane,
+      lane_state_pair: `${load.pu_state} - ${load.del_state}`,
       load_count: 0,
       rate_total: 0,
+      revenue: 0,
       miles_total: 0,
       rpm_total: 0,
       avg_rate: 0,
@@ -1293,6 +1452,7 @@ const laneRows = computed<ReportTableRow[]>(() => {
 
     row.load_count = toNumber(row.load_count) + 1;
     row.rate_total = toNumber(row.rate_total) + toNumber(load.rate);
+    row.revenue = toNumber(row.revenue) + toNumber(load.rate);
     row.miles_total = toNumber(row.miles_total) + toNumber(load.miles);
     row.rpm_total = toNumber(row.rpm_total) + toNumber(load.rpm);
 
@@ -1321,12 +1481,29 @@ const laneRowsForChart = computed(() =>
 );
 
 const laneChartOption = computed(() => ({
-  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: (params: any) => {
+      const items = Array.isArray(params) ? params : [params];
+      const dataIndex = Number(items[0]?.dataIndex ?? 0);
+      const row = laneRowsForChart.value[dataIndex];
+      if (!row) {
+        return '';
+      }
+
+      return [
+        String(row.lane),
+        `Orders: ${formatNumberValue(toNumber(row.load_count))}`,
+        `Revenue: ${formatCurrencyWhole(toNumber(row.revenue))}`,
+      ].join('<br/>');
+    },
+  },
   grid: { top: 22, right: 20, left: 52, bottom: 44 },
   xAxis: {
     type: 'category',
     axisLabel: { interval: 0, rotate: 20 },
-    data: laneRowsForChart.value.map((row) => String(row.lane)),
+    data: laneRowsForChart.value.map((row) => String(row.lane_state_pair)),
   },
   yAxis: {
     type: 'value',
@@ -1357,6 +1534,7 @@ const exceptionRows = computed<ReportTableRow[]>(() =>
       date: getLoadDateKey(load, filters.value.dateDimension) || getLoadDateKey(load, 'created_at'),
       customer: load.customer_name || 'Unknown Customer',
       account_manager: load.account_manager_name || 'Unassigned',
+      dispatcher: load.dispatcher_name || 'Unassigned',
       status: load.status,
       reason: getReasonText(load),
       load_ref: load.load_ref_number || '—',
@@ -1365,22 +1543,66 @@ const exceptionRows = computed<ReportTableRow[]>(() =>
 
 const sortedExceptionRows = computed(() => sortRows(exceptionRows.value, sortStates.exception, defaultSorts.exception));
 
-const exceptionReasonRows = computed(() => {
+const exceptionOwnerRows = computed(() => {
   const grouped = new Map<string, number>();
+  const ownerKey = exceptionChartView.value === 'account_manager' ? 'account_manager' : 'dispatcher';
 
   for (const row of exceptionRows.value) {
-    const reason = String(row.reason || 'No reason provided');
-    grouped.set(reason, (grouped.get(reason) ?? 0) + 1);
+    const owner = String(row[ownerKey] || 'Unassigned');
+    grouped.set(owner, (grouped.get(owner) ?? 0) + 1);
   }
 
   return [...grouped.entries()]
-    .map(([reason, count]) => ({ reason, count }))
-    .sort((left, right) => right.count - left.count)
+    .map(([owner, count]) => ({ owner, count }))
+    .sort((left, right) => {
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+
+      return left.owner.localeCompare(right.owner, undefined, { sensitivity: 'base' });
+    })
     .slice(0, 12);
 });
 
+const exceptionOwnerStatusMap = computed(() => {
+  const grouped = new Map<string, { DELAYED: number; CANCELED: number; TONU: number }>();
+  const ownerKey = exceptionChartView.value === 'account_manager' ? 'account_manager' : 'dispatcher';
+
+  for (const row of exceptionRows.value) {
+    const owner = String(row[ownerKey] || 'Unassigned');
+    const status = String(row.status) as LoadStatus;
+    const statusCounts = grouped.get(owner) ?? { DELAYED: 0, CANCELED: 0, TONU: 0 };
+
+    if (status === 'DELAYED' || status === 'CANCELED' || status === 'TONU') {
+      statusCounts[status] += 1;
+    }
+
+    grouped.set(owner, statusCounts);
+  }
+
+  return grouped;
+});
+
 const exceptionChartOption = computed(() => ({
-  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: (params: any) => {
+      const items = Array.isArray(params) ? params : [params];
+      const point = items[0];
+      const ownerLabel = exceptionChartView.value === 'account_manager' ? 'Account Manager' : 'Dispatcher';
+      const owner = String(point?.axisValueLabel ?? point?.name ?? '');
+      const breakdown = exceptionOwnerStatusMap.value.get(owner) ?? { DELAYED: 0, CANCELED: 0, TONU: 0 };
+
+      return [
+        `${ownerLabel}: ${owner}`,
+        `Orders: ${formatNumberValue(toNumber(point?.value))}`,
+        `Delayed: ${formatNumberValue(breakdown.DELAYED)}`,
+        `Canceled: ${formatNumberValue(breakdown.CANCELED)}`,
+        `TONU: ${formatNumberValue(breakdown.TONU)}`,
+      ].join('<br/>');
+    },
+  },
   grid: { top: 16, right: 20, left: 170, bottom: 24 },
   xAxis: {
     type: 'value',
@@ -1388,12 +1610,12 @@ const exceptionChartOption = computed(() => ({
   },
   yAxis: {
     type: 'category',
-    data: exceptionReasonRows.value.map((row) => row.reason),
+    data: exceptionOwnerRows.value.map((row) => row.owner),
   },
   series: [
     {
       type: 'bar',
-      data: exceptionReasonRows.value.map((row) => row.count),
+      data: exceptionOwnerRows.value.map((row) => row.count),
     },
   ],
 }));
@@ -1446,8 +1668,41 @@ const agingBucketRows = computed(() => {
   return buckets;
 });
 
+const agingBucketStatusBreakdown = computed(() => {
+  const buckets: Record<'0-2' | '3-7' | '8-14' | '15+', Map<LoadStatus, number>> = {
+    '0-2': new Map<LoadStatus, number>(),
+    '3-7': new Map<LoadStatus, number>(),
+    '8-14': new Map<LoadStatus, number>(),
+    '15+': new Map<LoadStatus, number>(),
+  };
+
+  for (const row of agingRows.value) {
+    const bucket = String(row.age_bucket) as '0-2' | '3-7' | '8-14' | '15+';
+    const status = String(row.status) as LoadStatus;
+    const bucketMap = buckets[bucket];
+    bucketMap.set(status, (bucketMap.get(status) ?? 0) + 1);
+  }
+
+  return buckets;
+});
+
 const agingChartOption = computed(() => ({
-  tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: (params: any) => {
+      const items = Array.isArray(params) ? params : [params];
+      const bucket = String(items[0]?.axisValue ?? '');
+      const count = toNumber(items[0]?.value);
+      const bucketMap = agingBucketStatusBreakdown.value[bucket as '0-2' | '3-7' | '8-14' | '15+'] ?? new Map<LoadStatus, number>();
+      const statusLines = statusOptions
+        .map((status) => ({ status, count: bucketMap.get(status) ?? 0 }))
+        .filter((item) => item.count > 0)
+        .map((item) => `${statusLabelWithLoads(item.status)} ${item.count}`);
+
+      return [`${bucket} days`, `Open loads in this bucket: ${formatNumberValue(count)}`, ...statusLines].join('<br/>');
+    },
+  },
   grid: { top: 22, right: 20, left: 42, bottom: 30 },
   xAxis: {
     type: 'category',
@@ -1503,14 +1758,4 @@ const visibleLedgerRows = computed(() => {
 
   return sortedLedgerRows.value.slice(0, Number(ledgerLimit.value));
 });
-
-const kpiChartRef = ref<{ chart: EChartsType } | null>(null);
-const volumeChartRef = ref<{ chart: EChartsType } | null>(null);
-const revenueChartRef = ref<{ chart: EChartsType } | null>(null);
-const pipelineChartRef = ref<{ chart: EChartsType } | null>(null);
-const customerChartRef = ref<{ chart: EChartsType } | null>(null);
-const accountManagerChartRef = ref<{ chart: EChartsType } | null>(null);
-const laneChartRef = ref<{ chart: EChartsType } | null>(null);
-const exceptionChartRef = ref<{ chart: EChartsType } | null>(null);
-const agingChartRef = ref<{ chart: EChartsType } | null>(null);
 </script>

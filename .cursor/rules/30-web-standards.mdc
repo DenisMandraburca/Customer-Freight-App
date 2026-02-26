@@ -1,0 +1,35 @@
+---
+description: Vue/frontend structure and conventions for apps/web (Vue 3 + Vite + Pinia + Vue Router + Vue Query + Tailwind).
+applyTo: "apps/web/**/*"
+---
+
+# Web standards (apps/web)
+
+## Architecture
+- Follow existing patterns for views, components, composables, and routing.
+- Use shared types/DTOs/constants from `@antigravity/shared` for request/response shapes and enums.
+
+## Data & state
+- Server state: prefer TanStack Vue Query.
+- UI/local state: prefer component state + composables.
+- Global state (Pinia): only when cross-route/shared state is required.
+
+## API usage
+- Call backend via `API_URL` / `API_BASE_PATH`.
+- Handle loading + error states consistently (skeleton/empty/error).
+
+## i18n
+- Do not change translation keys unless explicitly requested.
+- Add new keys in the existing style when needed.
+
+## Styling & naming (Tailwind)
+- **Do not inline large Tailwind class strings** directly in templates for reusable UI.
+  - Avoid: `class="rounded-lg border border-zinc-300 px-3 ..."` on repeated elements.
+- Prefer **semantic class names** via one of these patterns (match the codebase style):
+  1) Component-level constants (e.g. `const cardClass = "..."`) for one-off pages.
+  2) Extract shared UI into components (`<BaseButton/>`, `<Card/>`, `<Input/>`).
+  3) Use Tailwind `@layer components` + `@apply` to create semantic utilities (e.g. `.btn`, `.btn-primary`, `.card`, `.field-label`).
+- IDs, `data-test` attributes, and component names must be **meaningful and stable** (e.g. `data-test="load-create-submit"`).
+
+## File size
+- No file may exceed **800 lines**; split views/components/composables by responsibility.

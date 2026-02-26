@@ -1,0 +1,24 @@
+---
+description: Verification required before marking work complete (run the right checks for the impacted workspaces).
+applyTo: "**/*"
+---
+
+# Verification
+
+Before claiming work complete:
+
+- Run **type-check**, **lint/format** (if configured), and **relevant tests** for the changed area(s).
+- If changes touch `packages/shared`, you must validate **both** `apps/api` and `apps/web` for contract/type compatibility.
+- Use the verifier skill (or `qa-verifier` subagent) for a final verification pass.
+
+## Report format (required)
+- What was verified (commands)
+- What failed (if anything)
+- Actionable next steps
+- Clear verdict: **Ready to ship** / **Blocked by: ...**
+
+## Minimum edge cases
+- Empty inputs
+- Invalid data
+- Error paths
+- Integration points (API ↔ shared DTOs/types ↔ web)

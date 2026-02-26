@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  ACCOUNT_MANAGER
+  DISPATCHER
+  VIEWER
+  BANNED
+
+  @@map("user_role")
+}
+
+enum LoadStatus {
+  AVAILABLE
+  PENDING_APPROVAL
+  QUOTE_SUBMITTED
+  COVERED
+  LOADED
+  DELAYED
+  DELIVERED
+  BROKERAGE
+  CANCELED
+  TONU
+
+  @@map("load_status")
+}
+
+model User {
+  id             String   @id
+  email          String   @unique
+  name           String
+  role           UserRole @default(DISPATCHER)
+  fullLoadAccess Boolean  @default(false) @map("full_load_access")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @map("updated_at")
+
+  managedLoads   Load[]   @relation("LoadAccountManager")
+  dispatchLoads  Load[]   @relation("LoadDispatcher")
+
+  @@map("users")
+}
+
+model Customer {
+  id          String    @id
+  name        String    @unique
+  type        String
+  quoteAccept Boolean   @default(false) @map("quote_accept")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+
+  loads       Load[]
+
+  @@map("customers")
+}
+
+model GreenbushBank {
+  id             String    @id
+  legacyId       String?   @unique(map: "idx_greenbush_legacy_id_unique") @map("legacy_id")
+  pickupLocation String    @map("pickup_location")
+  destination    String
+  receivingHours String?   @map("receiving_hours")
+  price          Decimal
+  tarp           String?
+  remainingCount Int       @default(0) @map("remaining_count")
+  reservedCount  Int       @default(0) @map("reserved_count")
+  specialNotes   String?   @map("special_notes")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @map("updated_at")
+
+  loads          Load[]
+
+  @@map("greenbush_bank")
+}
+
+model Load {
+  id                   String      @id
+  legacyId             String?     @unique(map: "idx_loads_legacy_id_unique") @map("legacy_id")
+  createdAt            DateTime    @default(now()) @map("created_at")
+  status               LoadStatus  @default(AVAILABLE)
+  accountManagerId     String?     @map("account_manager_id")
+  customerId           String?     @map("customer_id")
+  loadRefNumber        String      @map("load_ref_number")
+  mcleodOrderId        String?     @map("mcleod_order_id")
+  requestedPickupDate  DateTime?   @map("requested_pickup_date")
+  puCity               String      @map("pu_city")
+  puState              String      @map("pu_state")
+  puZip                String?     @map("pu_zip")
+  puDate               DateTime?   @map("pu_date")
+  puApptTime           String?     @map("pu_appt_time")
+  puAppt               Boolean     @default(false) @map("pu_appt")
+  delCity              String      @map("del_city")
+  delState             String      @map("del_state")
+  delZip               String?     @map("del_zip")
+  delDate              DateTime?   @map("del_date")
+  delApptTime          String?     @map("del_appt_time")
+  delAppt              Boolean     @default(false) @map("del_appt")
+  rate                 Decimal
+  miles                Decimal
+  rpm                  Decimal
+  notes                String?
+  equipment            String?
+  assignedDispatcherId String?     @map("assigned_dispatcher_id")
+  driverName           String?     @map("driver_name")
+  truckNumber          String?     @map("truck_number")
+  reasonLog            String?     @map("reason_log")
+  delayReason          String?     @map("delay_reason")
+  cancelReason         String?     @map("cancel_reason")
+  denyQuoteReason      String?     @map("deny_quote_reason")
+  otherNotes           String?     @map("other_notes")
+  greenbushBankId      String?     @map("greenbush_bank_id")
+
+  accountManager       User?        @relation("LoadAccountManager", fields: [accountManagerId], references: [id])
+  customer             Customer?    @relation(fields: [customerId], references: [id])
+  dispatcher           User?        @relation("LoadDispatcher", fields: [assignedDispatcherId], references: [id])
+  greenbushBank        GreenbushBank? @relation(fields: [greenbushBankId], references: [id])
+
+  @@index([status], map: "idx_loads_status")
+  @@index([assignedDispatcherId], map: "idx_loads_dispatcher")
+  @@index([customerId], map: "idx_loads_customer")
+  @@index([puDate], map: "idx_loads_pu_date")
+  @@map("loads")
+}

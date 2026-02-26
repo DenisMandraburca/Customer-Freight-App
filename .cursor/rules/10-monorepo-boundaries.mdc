@@ -1,0 +1,31 @@
+---
+description: Workspace boundaries, imports, package ownership, and build order for the npm workspaces monorepo.
+applyTo: "**/*"
+---
+
+# Monorepo boundaries (npm workspaces)
+
+## Ownership & dependency rules
+- **Apps**
+  - `apps/api`: Node/Express API
+  - `apps/web`: Vue 3 frontend
+  - Apps may depend on **packages only** (`packages/*`).
+
+- **Packages**
+  - `packages/shared`: shared types/constants/DTOs (source of truth for contracts)
+  - `packages/db`: Prisma schema/client/migrations and reusable query/repository helpers
+  - Packages **must not** depend on apps.
+
+- **Imports**
+  - No cross-app imports.
+  - Shared contracts go in `packages/shared`.
+  - Use workspace package names (e.g. `@antigravity/shared`, `@antigravity/db`).
+  - Do not use relative imports across package boundaries.
+
+## Build & change discipline
+- **Build order**: `packages/shared` → `packages/db` → `apps/api` / `apps/web`.
+- Prefer workspace-targeted commands (`npm -w <workspace> ...`) over running scripts at repo root unless the script is designed to fan out.
+- If a change touches `packages/shared`, you must validate both API and Web for type/contract compatibility.
+
+## File size & cohesion
+- Keep modules focused and cohesive. If a file approaches 800 lines, split by responsibility (route vs service vs repo vs schema; component vs composable vs view).

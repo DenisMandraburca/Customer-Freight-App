@@ -1,0 +1,42 @@
+---
+description: Orchestrate work across api/web/db/shared automatically.
+applyTo: "**/*"
+---
+
+# Orchestrator
+
+## Default workflow (always)
+When the user asks to build/change something, follow this sequence:
+
+1) **Triage impacted areas by path**
+- `apps/api/**` => API
+- `apps/web/**` => Web
+- `packages/db/**` or `prisma/schema.prisma` => DB/Prisma
+- `packages/shared/**` => Shared types/contracts
+
+2) **Plan first (short, actionable)**
+- Requirements restatement
+- Files/workspaces impacted
+- Risks (auth/session, DB migration, shared contract changes)
+- Implementation order (`shared` → `db` → `api` → `web`)
+- Test plan (unit/integration + UI states)
+
+3) **Delegate by domain (required)**
+- API => subagent: `api-implementer`
+- Web => subagent: `web-implementer`
+- DB/Prisma => subagent: `db-prisma`
+- Shared contracts => subagent: `shared-types-guardian`
+
+4) **Verification gate (required)**
+- Always delegate final validation to subagent: `qa-verifier`.
+
+5) **Completion format (required)**
+Your final answer must end with:
+- **Verification commands**
+- **Expected results**
+- **Risk notes**
+
+## Guardrails
+- **No file may exceed 800 lines.** If a change pushes a file over 800 lines (or the file is already near 800), split into smaller, focused modules by responsibility (e.g., `routes/`, `services/`, `repos/`, `components/`, `composables/`).
+- Prefer *small diffs* and *single-responsibility files*. Avoid “god files” and mixed concerns.
+- Do not introduce placeholders in critical paths (auth, data validation, DB writes).

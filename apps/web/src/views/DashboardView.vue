@@ -28,7 +28,13 @@
                 </span>
                 <span v-if="!ui.navCollapsed">{{ item.label }}</span>
               </span>
-              <span v-if="item.badge && !ui.navCollapsed" class="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">{{ item.badge }}</span>
+              <span
+                v-if="item.badge && !ui.navCollapsed"
+                class="rounded-full px-1.5 py-0.5 text-[10px] font-bold transition-colors"
+                :class="activeTab === item.id ? 'bg-white/20 text-white' : 'bg-red-600 text-white'"
+              >
+                {{ item.badge }}
+              </span>
             </button>
           </nav>
 

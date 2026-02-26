@@ -1,0 +1,24 @@
+---
+description: Prisma schema, migrations, and DB access conventions in packages/db.
+applyTo: "packages/db/**/*"
+---
+
+# DB / Prisma standards (packages/db)
+
+## Schema & migrations
+- Prisma schema lives in `packages/db`.
+- Prefer additive, backwards-compatible schema changes when possible.
+- Generate/apply migrations via the db workspace scripts (e.g. `npm -w @antigravity/db run migrate`).
+- Do not hand-edit migration SQL unless necessary; if edited, document why and how to verify.
+
+## Client & access patterns
+- Use the exported Prisma client from `@antigravity/db`.
+- No raw connection handling in apps; go through the db package.
+- Prefer repository/query helpers in `packages/db` for complex/reusable queries; keep API handlers thin.
+
+## Environment
+- Use `DATABASE_URL` (Postgres) or `SQLITE_URL` (dev) as applicable.
+- Never hardcode credentials.
+
+## File size
+- No file may exceed **800 lines**; split schema helpers/repos/queries by responsibility.

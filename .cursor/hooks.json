@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "npx tsx .cursor/hooks/after-file-edit.ts"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/stop-checks.ts"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .cursor/hooks/pre-tool-guard.ts"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "node .cursor/hooks/pre-tool-guard.ts"
+      }
+    ]
+  }
+}

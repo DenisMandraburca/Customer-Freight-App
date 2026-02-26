@@ -1,0 +1,41 @@
+---
+description: API route structure, validation, logging, and conventions for apps/api (Express + Zod + Prisma).
+applyTo: "apps/api/**/*"
+---
+
+# API standards (apps/api)
+
+## Routing & structure
+- **Base path**: `/api/customer-freight` (or `API_BASE_PATH`). All routes live under this prefix.
+- Prefer a layered structure for non-trivial features:
+  - `routes/` (Express handlers + Zod validation)
+  - `services/` (business logic)
+  - `repos/` (DB access via `@antigravity/db`)
+- Route handlers must be thin: validate → authorize → call service → return response.
+
+## Auth & authorization
+- `req.userSession` is injected by the integration layer. Use it for `id`, `email`, `permissions`.
+- Do not implement auth via custom headers in route logic.
+- Enforce permissions where applicable (e.g. `customer-freight:access`, `customer-freight:admin`); reject with **403** when missing.
+
+## Validation (Zod)
+- Validate **body/query/params** at route entry.
+- On validation failure: return **400** with a clear, stable error shape.
+- Prefer DTOs/types from `@antigravity/shared` as the contract, and use Zod schemas that match them.
+
+## Responses & errors
+- Responses are JSON with consistent shapes.
+  - Success: `{ data: ... }`
+  - Error: `{ error: { code, message, details? } }`
+- Use correct status codes (400/401/403/404/409/422/500).
+- No stack traces in production responses.
+
+## Logging & security middleware
+- Use `pino` for request-scoped logs (avoid logging secrets/PII).
+- Keep `helmet` and `cors` configuration consistent with existing app conventions.
+
+## Health
+- `GET /api/customer-freight/health` returns `{ "status": "ok" }`.
+
+## File size
+- No file may exceed **800 lines**; split routes/services/repos as needed.
