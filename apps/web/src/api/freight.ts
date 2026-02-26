@@ -362,3 +362,9 @@ export async function bulkImportCustomers(rows: Array<Record<string, string>>): 
     body: JSON.stringify({ rows }),
   });
 }
+
+export async function deleteAllLoadsDev(): Promise<{ deletedCount: number }> {
+  return unwrap<{ deletedCount: number }>('/api/customer-freight/loads/dev/all', {
+    method: 'DELETE',
+  });
+}

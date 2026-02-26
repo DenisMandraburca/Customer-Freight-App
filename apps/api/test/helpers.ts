@@ -23,6 +23,14 @@ export interface TestContext {
 }
 
 export async function bootTestContext(): Promise<TestContext> {
+  if (!process.env.DB_PROVIDER) {
+    process.env.DB_PROVIDER = 'postgres';
+  }
+
+  if (process.env.DB_PROVIDER?.toLowerCase() === 'sqlite') {
+    throw new Error('SQLite is not supported for API integration tests. Set DB_PROVIDER=postgres.');
+  }
+
   if (!process.env.DATABASE_URL && !process.env.SUPABASE_DB_URL && !process.env.SUPABASE_URL) {
     throw new Error('DATABASE_URL (or SUPABASE_DB_URL/SUPABASE_URL) is required for API integration tests.');
   }

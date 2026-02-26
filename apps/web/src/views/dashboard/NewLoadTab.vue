@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h2 class="text-sm font-black uppercase tracking-widest text-zinc-500">
+      <h2 class="text-sm font-black uppercase tracking-widest text-zinc-700">
         New Load
       </h2>
     </div>

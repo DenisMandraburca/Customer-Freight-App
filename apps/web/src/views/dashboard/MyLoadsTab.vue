@@ -1,16 +1,16 @@
 <template>
   <section class="space-y-6">
     <header class="flex items-center justify-between">
-      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-500">My Loads</h3>
-      <p class="text-xs text-zinc-500">Pending: {{ reviewLoads.length + greenbushRequests.length }}</p>
+      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-700">My Loads</h3>
+      <p class="text-xs text-zinc-700">Pending: {{ reviewLoads.length + greenbushRequests.length }}</p>
     </header>
 
     <article class="space-y-3">
-      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-400">Pending / Quotes</h4>
+      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-600">Pending / Quotes</h4>
       <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-xs">
-            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
               <tr>
                 <th class="px-3 py-2">Ref#</th>
                 <th class="px-3 py-2">Customer</th>
@@ -25,7 +25,7 @@
               <tr v-for="load in reviewLoads" :key="load.id">
                 <td class="px-3 py-2 font-semibold">{{ load.load_ref_number || '—' }}</td>
                 <td class="px-3 py-2">{{ load.customer_name || '—' }}</td>
-                <td class="px-3 py-2">{{ load.pu_city }}, {{ load.pu_state }} ? {{ load.del_city }}, {{ load.del_state }}</td>
+                <td class="px-3 py-2">{{ load.pu_city }}, {{ load.pu_state }} → {{ load.del_city }}, {{ load.del_state }}</td>
                 <td class="px-3 py-2">{{ load.dispatcher_name || '—' }}</td>
                 <td class="px-3 py-2">{{ load.driver_name || '—' }} / {{ load.truck_number || '—' }}</td>
                 <td class="px-3 py-2">{{ formatDateDisplay(load.pu_date) || '—' }}</td>
@@ -42,7 +42,7 @@
                 </td>
               </tr>
               <tr v-if="reviewLoads.length === 0">
-                <td colspan="7" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+                <td colspan="7" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
               </tr>
             </tbody>
           </table>
@@ -51,11 +51,11 @@
     </article>
 
     <article class="space-y-3">
-      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-400">Greenbush Requests</h4>
+      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-600">Greenbush Requests</h4>
       <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-xs">
-            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
               <tr>
                 <th class="px-3 py-2">Route</th>
                 <th class="px-3 py-2">Requested Pickup Date</th>
@@ -67,7 +67,7 @@
             </thead>
             <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
               <tr v-for="row in greenbushRequests" :key="row.id">
-                <td class="px-3 py-2">{{ row.pu_city }}, {{ row.pu_state }} ? {{ row.del_city }}, {{ row.del_state }}</td>
+                <td class="px-3 py-2">{{ row.pu_city }}, {{ row.pu_state }} → {{ row.del_city }}, {{ row.del_state }}</td>
                 <td class="px-3 py-2">{{ formatDateDisplay(row.requested_pickup_date) || '—' }}</td>
                 <td class="px-3 py-2">{{ row.dispatcher_name || '—' }}</td>
                 <td class="px-3 py-2">{{ row.truck_number || '—' }}</td>
@@ -84,7 +84,7 @@
                 </td>
               </tr>
               <tr v-if="greenbushRequests.length === 0">
-                <td colspan="6" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+                <td colspan="6" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
               </tr>
             </tbody>
           </table>
@@ -93,11 +93,11 @@
     </article>
 
     <article class="space-y-3">
-      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-400">Active Loads</h4>
+      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-600">Active Loads</h4>
       <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-xs">
-            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
               <tr>
                 <th class="px-3 py-2">Specs</th>
                 <th class="px-3 py-2">Ref#</th>
@@ -125,10 +125,10 @@
                 </td>
                 <td class="px-3 py-2">
                   <div class="font-semibold">{{ row.load_ref_number || '—' }}</div>
-                  <div v-if="row.mcleod_order_id" class="text-[10px] text-zinc-400">McLeod: {{ row.mcleod_order_id }}</div>
+                  <div v-if="row.mcleod_order_id" class="text-[10px] text-zinc-600">McLeod: {{ row.mcleod_order_id }}</div>
                 </td>
                 <td class="px-3 py-2">{{ row.account_manager_name || '—' }}</td>
-                <td class="px-3 py-2">{{ row.pu_city }}, {{ row.pu_state }} ? {{ row.del_city }}, {{ row.del_state }}</td>
+                <td class="px-3 py-2">{{ row.pu_city }}, {{ row.pu_state }} → {{ row.del_city }}, {{ row.del_state }}</td>
                 <td class="px-3 py-2">
                   <div>{{ formatDateDisplay(row.pu_date) || '—' }} - {{ formatDateDisplay(row.del_date) || '—' }}</div>
                   <div v-if="apptDisplay(row.pu_appt, row.pu_appt_time).show" :class="apptDisplay(row.pu_appt, row.pu_appt_time).className">
@@ -140,9 +140,9 @@
                 </td>
                 <td class="px-3 py-2">
                   <div>{{ row.driver_name || '—' }}</div>
-                  <div v-if="row.truck_number" class="text-[10px] text-zinc-400">Truck#: {{ row.truck_number }}</div>
+                  <div v-if="row.truck_number" class="text-[10px] text-zinc-600">Truck#: {{ row.truck_number }}</div>
                 </td>
-                <td class="px-3 py-2">{{ row.status === 'BROKERAGE' ? '' : (row.dispatcher_name || '—') }}</td>
+                <td class="px-3 py-2">{{ row.dispatcher_name || '—' }}</td>
                 <td class="px-3 py-2">
                   <span :class="statusBadge(row.status)">{{ row.status }}</span>
                 </td>
@@ -162,7 +162,7 @@
                 </td>
               </tr>
               <tr v-if="activeLoads.length === 0">
-                <td colspan="9" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+                <td colspan="9" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
               </tr>
             </tbody>
           </table>
@@ -170,98 +170,105 @@
       </div>
     </article>
 
-    <SpecsModal
-      v-if="selectedLoadId"
-      :notes="selectedSpecs"
-      :editable="canEditSpecs"
-      title="Load Specs"
-      @close="closeSpecs"
-      @save="saveSpecs"
-    />
+    <teleport to="body">
+      <SpecsModal
+        v-if="selectedLoadId"
+        :notes="selectedSpecs"
+        :editable="canEditSpecs"
+        title="Load Specs"
+        @close="closeSpecs"
+        @save="saveSpecs"
+      />
 
-    <div v-if="showReviewModal && reviewLoad" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div class="w-full max-w-2xl rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
-        <div class="flex items-center justify-between">
-          <h4 class="text-sm font-bold">Review Load {{ reviewLoad.load_ref_number || '—' }}</h4>
-          <button type="button" class="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeReview">X</button>
+      <div v-if="showReviewModal && reviewLoad" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-2xl rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold">
+              Review Load {{ reviewLoad.load_ref_number || '—' }}
+              <span class="font-semibold text-zinc-600 dark:text-zinc-300">
+                from {{ reviewLoad.dispatcher_name || reviewLoad.account_manager_name || 'Unknown user' }}
+              </span>
+            </h4>
+            <button type="button" class="text-sm text-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeReview">X</button>
+          </div>
+
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <label class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              Requested Pickup Date
+              <input
+                v-model="reviewState.requestedPickupDate"
+                type="date"
+                disabled
+                class="mt-1 w-full cursor-not-allowed rounded border border-zinc-300 bg-zinc-100 px-2 py-1.5 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+              />
+            </label>
+            <label class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              New Delivery Date
+              <input
+                v-model="reviewState.newDeliveryDate"
+                type="date"
+                class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+              />
+            </label>
+            <label class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              Load Ref #
+              <input
+                v-model="reviewState.loadRefNumber"
+                type="text"
+                class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+              />
+            </label>
+            <label class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              McLeod #
+              <input
+                v-model="reviewState.mcleodOrderId"
+                type="text"
+                class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+              />
+            </label>
+            <label class="sm:col-span-2 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+              Deny Reason
+              <textarea
+                v-model="reviewState.denyReason"
+                rows="3"
+                class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+                placeholder="Required when denying"
+              />
+            </label>
+          </div>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeReview">Cancel</button>
+            <button type="button" class="rounded bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800" @click="submitReview('deny')">Deny</button>
+            <button type="button" class="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800" @click="submitReview('accept')">Accept</button>
+          </div>
         </div>
+      </div>
 
-        <div class="mt-3 grid gap-3 sm:grid-cols-2">
-          <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-            Requested Pickup Date
-            <input
-              v-model="reviewState.requestedPickupDate"
-              type="text"
-              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-            />
-          </label>
-          <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-            New Delivery Date
-            <input
-              v-model="reviewState.newDeliveryDate"
-              type="text"
-              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              :placeholder="reviewLoad.status === 'QUOTE_SUBMITTED' ? 'Required for quote acceptance' : 'Optional'"
-            />
-          </label>
-          <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-            Load Ref #
-            <input
-              v-model="reviewState.loadRefNumber"
-              type="text"
-              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-            />
-          </label>
-          <label class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-            McLeod #
-            <input
-              v-model="reviewState.mcleodOrderId"
-              type="text"
-              class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-            />
-          </label>
-          <label class="sm:col-span-2 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-            Deny Reason
+      <div v-if="showReasonModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-md rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold">{{ reasonAction }} Reason</h4>
+            <button type="button" class="text-sm text-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeReasonModal">X</button>
+          </div>
+
+          <label class="mt-3 block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+            Reason
             <textarea
-              v-model="reviewState.denyReason"
-              rows="3"
+              v-model="reasonText"
+              rows="4"
               class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              placeholder="Required when denying"
+              placeholder="Enter reason"
             />
           </label>
-        </div>
 
-        <div class="mt-4 flex justify-end gap-2">
-          <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeReview">Cancel</button>
-          <button type="button" class="rounded bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-800" @click="submitReview('deny')">Deny</button>
-          <button type="button" class="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800" @click="submitReview('accept')">Accept</button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showReasonModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div class="w-full max-w-md rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
-        <div class="flex items-center justify-between">
-          <h4 class="text-sm font-bold">{{ reasonAction }} Reason</h4>
-          <button type="button" class="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" @click="closeReasonModal">X</button>
-        </div>
-
-        <label class="mt-3 block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
-          Reason
-          <textarea
-            v-model="reasonText"
-            rows="4"
-            class="mt-1 w-full rounded border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-            placeholder="Enter reason"
-          />
-        </label>
-
-        <div class="mt-4 flex justify-end gap-2">
-          <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeReasonModal">Cancel</button>
-          <button type="button" class="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800" @click="confirmReason">Confirm</button>
+          <div class="mt-4 flex justify-end gap-2">
+            <button type="button" class="rounded bg-zinc-200 px-3 py-1.5 text-xs font-semibold dark:bg-zinc-700" @click="closeReasonModal">Cancel</button>
+            <button type="button" class="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800" @click="confirmReason">Confirm</button>
+          </div>
         </div>
       </div>
-    </div>
+    </teleport>
   </section>
 </template>
 
@@ -358,10 +365,34 @@ const greenbushRequests = computed(() =>
 );
 
 const activeLoads = computed(() =>
-  scopedLoads.value.filter((load) => ['COVERED', 'LOADED', 'DELAYED', 'BROKERAGE'].includes(load.status)),
+  scopedLoads.value.filter((load) => ['COVERED', 'LOADED', 'DELAYED'].includes(load.status)),
 );
 
 const canEditSpecs = computed(() => props.user?.role === 'ADMIN' || props.user?.role === 'MANAGER');
+
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  const direct = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (direct) {
+    return `${direct[1]}-${direct[2]}-${direct[3]}`;
+  }
+
+  const isoPrefix = /^(\d{4})-(\d{2})-(\d{2})T/.exec(trimmed);
+  if (isoPrefix) {
+    return `${isoPrefix[1]}-${isoPrefix[2]}-${isoPrefix[3]}`;
+  }
+
+  const mmddyyyy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  if (mmddyyyy) {
+    return `${mmddyyyy[3]}-${mmddyyyy[1]!.padStart(2, '0')}-${mmddyyyy[2]!.padStart(2, '0')}`;
+  }
+
+  return '';
+}
 
 function reviewButtonClass(status: LoadStatus, enabled: boolean): string {
   if (!enabled) {
@@ -405,8 +436,8 @@ function openReview(load: LoadRecord): void {
   }
 
   reviewLoad.value = load;
-  reviewState.requestedPickupDate = load.requested_pickup_date ?? load.pu_date ?? '';
-  reviewState.newDeliveryDate = load.del_date ?? '';
+  reviewState.requestedPickupDate = toDateInputValue(load.requested_pickup_date ?? load.pu_date ?? '');
+  reviewState.newDeliveryDate = toDateInputValue(load.del_date);
   reviewState.loadRefNumber = load.load_ref_number ?? '';
   reviewState.mcleodOrderId = load.mcleod_order_id ?? '';
   reviewState.denyReason = '';

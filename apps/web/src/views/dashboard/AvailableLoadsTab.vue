@@ -4,16 +4,16 @@
       <header class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-400">Available Loads</h3>
+          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-600">Available Loads</h3>
         </div>
-        <p class="text-[10px] font-bold text-zinc-500">{{ sortedAvailableLoads.length }} open</p>
+        <p class="text-[10px] font-bold text-zinc-700">{{ sortedAvailableLoads.length }} open</p>
       </header>
 
       <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
         <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
           <button
             type="button"
-            class="flex h-5 w-5 items-center justify-center rounded text-zinc-400 transition-transform duration-200 hover:text-zinc-700 dark:hover:text-zinc-200"
+            class="flex h-5 w-5 items-center justify-center rounded text-zinc-600 transition-transform duration-200 hover:text-zinc-700 dark:hover:text-zinc-200"
             :class="availableExpanded ? '' : '-rotate-90'"
             :aria-label="availableExpanded ? 'Collapse table' : 'Expand table'"
             @click="availableExpanded = !availableExpanded"
@@ -22,10 +22,10 @@
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
-          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Available Loads</h3>
+          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Available Loads</h3>
 
           <div class="ml-auto flex items-center gap-2">
-            <span class="text-[10px] text-zinc-400">Show:</span>
+            <span class="text-[10px] text-zinc-600">Show:</span>
             <select
               v-model="availablePerPage"
               class="rounded border border-zinc-300 px-1 py-0.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
@@ -50,7 +50,7 @@
           <div v-show="availableExpanded">
             <div class="overflow-x-auto">
               <table class="min-w-full text-left text-xs">
-                <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+                <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
                   <tr>
                     <th class="px-3 py-2">Specs</th>
                     <th class="cursor-pointer select-none px-3 py-2 hover:text-zinc-900 dark:hover:text-white" @click="cycleSort(availableSort, 'ref')">
@@ -103,7 +103,7 @@
                     </td>
                     <td class="px-3 py-2 font-semibold text-zinc-800 dark:text-zinc-200" :title="historyTooltip(load)">
                       <div>{{ load.load_ref_number || '—' }}</div>
-                      <div v-if="load.mcleod_order_id" class="text-[10px] font-normal text-zinc-400">McLeod: {{ load.mcleod_order_id }}</div>
+                      <div v-if="load.mcleod_order_id" class="text-[10px] font-normal text-zinc-600">McLeod: {{ load.mcleod_order_id }}</div>
                     </td>
                     <td class="px-3 py-2 text-zinc-700 dark:text-zinc-300">{{ load.pu_city }}, {{ load.pu_state }} → {{ load.del_city }}, {{ load.del_state }}</td>
                     <td class="px-3 py-2">
@@ -144,7 +144,7 @@
                     </td>
                   </tr>
                   <tr v-if="paginatedAvailableLoads.length === 0">
-                    <td colspan="10" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+                    <td colspan="10" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
                   </tr>
                 </tbody>
               </table>
@@ -152,7 +152,7 @@
 
             <div
               v-if="availablePerPage !== 'All' && availableTotalPages > 1"
-              class="flex items-center justify-between px-3 pt-2 text-xs text-zinc-500"
+              class="flex items-center justify-between px-3 pt-2 text-xs text-zinc-700"
             >
               <span>
                 Showing {{ availableStart }}–{{ availableEnd }} of {{ sortedAvailableLoads.length }}
@@ -184,16 +184,16 @@
       <header class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-400">Available Greenbush</h3>
+          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-600">Available Greenbush</h3>
         </div>
-        <p class="text-[10px] font-bold text-zinc-500">{{ sortedGreenbushLoads.length }} routes</p>
+        <p class="text-[10px] font-bold text-zinc-700">{{ sortedGreenbushLoads.length }} routes</p>
       </header>
 
       <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
         <div class="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
           <button
             type="button"
-            class="flex h-5 w-5 items-center justify-center rounded text-zinc-400 transition-transform duration-200 hover:text-zinc-700 dark:hover:text-zinc-200"
+            class="flex h-5 w-5 items-center justify-center rounded text-zinc-600 transition-transform duration-200 hover:text-zinc-700 dark:hover:text-zinc-200"
             :class="greenbushExpanded ? '' : '-rotate-90'"
             :aria-label="greenbushExpanded ? 'Collapse table' : 'Expand table'"
             @click="greenbushExpanded = !greenbushExpanded"
@@ -202,10 +202,10 @@
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
-          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Available Greenbush Loads</h3>
+          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Available Greenbush Loads</h3>
 
           <div class="ml-auto flex items-center gap-2">
-            <span class="text-[10px] text-zinc-400">Show:</span>
+            <span class="text-[10px] text-zinc-600">Show:</span>
             <select
               v-model="greenbushPerPage"
               class="rounded border border-zinc-300 px-1 py-0.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
@@ -230,7 +230,7 @@
           <div v-show="greenbushExpanded">
             <div class="overflow-x-auto">
               <table class="min-w-full text-left text-xs">
-                <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+                <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
                   <tr>
                     <th class="px-3 py-2">Specs</th>
                     <th class="cursor-pointer select-none px-3 py-2 hover:text-zinc-900 dark:hover:text-white" @click="cycleSort(greenbushSort, 'route')">
@@ -280,7 +280,7 @@
                     </td>
                   </tr>
                   <tr v-if="paginatedGreenbushLoads.length === 0">
-                    <td colspan="7" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+                    <td colspan="7" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
                   </tr>
                 </tbody>
               </table>
@@ -288,7 +288,7 @@
 
             <div
               v-if="greenbushPerPage !== 'All' && greenbushTotalPages > 1"
-              class="flex items-center justify-between px-3 pt-2 text-xs text-zinc-500"
+              class="flex items-center justify-between px-3 pt-2 text-xs text-zinc-700"
             >
               <span>
                 Showing {{ greenbushStart }}–{{ greenbushEnd }} of {{ sortedGreenbushLoads.length }}

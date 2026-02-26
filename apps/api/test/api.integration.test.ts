@@ -63,6 +63,326 @@ integration('API integration', () => {
     expect(Number(response.body.data.rpm)).toBe(2);
   });
 
+  it('POST /api/customer-freight/loads/bulk imports row with Load_Status=COVERED', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        rows: [
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-STATUS-COVERED',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '1200',
+            Miles: '600',
+            Load_Status: 'COVERED',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.importedCount).toBe(1);
+    expect(response.body.data.failedCount).toBe(0);
+
+    const loadsResponse = await ctx.request
+      .get('/api/customer-freight/loads?ref=BULK-STATUS-COVERED')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(loadsResponse.status).toBe(200);
+    expect(loadsResponse.body.data).toHaveLength(1);
+    expect(loadsResponse.body.data[0].status).toBe('COVERED');
+  });
+
+  it('POST /api/customer-freight/loads/bulk accepts alias Load_Status=PENDING', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        rows: [
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-STATUS-PENDING',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '1200',
+            Miles: '600',
+            Load_Status: 'PENDING',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.importedCount).toBe(1);
+    expect(response.body.data.failedCount).toBe(0);
+
+    const loadsResponse = await ctx.request
+      .get('/api/customer-freight/loads?ref=BULK-STATUS-PENDING')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(loadsResponse.status).toBe(200);
+    expect(loadsResponse.body.data).toHaveLength(1);
+    expect(loadsResponse.body.data[0].status).toBe('PENDING_APPROVAL');
+  });
+
+  it('POST /api/customer-freight/loads/bulk defaults to AVAILABLE when Load_Status is blank', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        rows: [
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-STATUS-BLANK',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '1200',
+            Miles: '600',
+            Load_Status: '   ',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.importedCount).toBe(1);
+    expect(response.body.data.failedCount).toBe(0);
+
+    const loadsResponse = await ctx.request
+      .get('/api/customer-freight/loads?ref=BULK-STATUS-BLANK')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(loadsResponse.status).toBe(200);
+    expect(loadsResponse.body.data).toHaveLength(1);
+    expect(loadsResponse.body.data[0].status).toBe('AVAILABLE');
+  });
+
+  it('POST /api/customer-freight/loads/bulk rejects invalid Load_Status per-row and preserves partial import', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        rows: [
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-STATUS-VALID',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '1200',
+            Miles: '600',
+            Load_Status: 'COVERED',
+          },
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-STATUS-INVALID',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '1200',
+            Miles: '600',
+            Load_Status: 'NOT_A_STATUS',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.importedCount).toBe(1);
+    expect(response.body.data.failedCount).toBe(1);
+    expect(response.body.data.errors).toHaveLength(1);
+    expect(response.body.data.errors[0].row).toBe(3);
+    expect(response.body.data.errors[0].message).toContain('Invalid Load_Status');
+    expect(response.body.data.errors[0].message).toContain('NOT_A_STATUS');
+  });
+
+  it('POST /api/customer-freight/loads/bulk accepts Rate/Miles formatted with currency and thousands separators', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        rows: [
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-FORMATTED-NUMBERS',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '$3,300',
+            Miles: '1,297',
+            Load_Status: 'BROKERAGE',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.importedCount).toBe(1);
+    expect(response.body.data.failedCount).toBe(0);
+
+    const loadsResponse = await ctx.request
+      .get('/api/customer-freight/loads?ref=BULK-FORMATTED-NUMBERS')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(loadsResponse.status).toBe(200);
+    expect(loadsResponse.body.data).toHaveLength(1);
+    expect(Number(loadsResponse.body.data[0].rate)).toBe(3300);
+    expect(Number(loadsResponse.body.data[0].miles)).toBe(1297);
+  });
+
+  it('POST /api/customer-freight/loads/bulk allows Miles=0 only for TONU status', async () => {
+    const response = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        rows: [
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-TONU-ZERO',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '500',
+            Miles: '0',
+            Load_Status: 'TONU',
+          },
+          {
+            Customer: ctx.customer.name,
+            Load_Ref_Number: 'BULK-NON-TONU-ZERO',
+            PU_City: 'Chicago',
+            PU_State: 'IL',
+            DEL_City: 'Dallas',
+            DEL_State: 'TX',
+            Rate: '500',
+            Miles: '0',
+            Load_Status: 'DELIVERED',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.importedCount).toBe(1);
+    expect(response.body.data.failedCount).toBe(1);
+    expect(response.body.data.errors[0].row).toBe(3);
+    expect(response.body.data.errors[0].message).toContain('Miles can be 0 only when status is TONU');
+  });
+
+  it('rejects duplicate McLeod # but allows empty McLeod #', async () => {
+    const first = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'LD-MC-1',
+        mcleodOrderId: 'MC-DUP-1001',
+        puCity: 'Chicago',
+        puState: 'IL',
+        delCity: 'Dallas',
+        delState: 'TX',
+        rate: 1000,
+        miles: 600,
+      });
+    expect(first.status).toBe(201);
+
+    const duplicate = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'LD-MC-2',
+        mcleodOrderId: 'MC-DUP-1001',
+        puCity: 'Chicago',
+        puState: 'IL',
+        delCity: 'Austin',
+        delState: 'TX',
+        rate: 1000,
+        miles: 600,
+      });
+
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.message).toContain('McLeod # already exists');
+
+    const emptyOne = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'LD-MC-EMPTY-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        delCity: 'Dallas',
+        delState: 'TX',
+        rate: 1000,
+        miles: 600,
+      });
+    expect(emptyOne.status).toBe(201);
+
+    const emptyTwo = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'LD-MC-EMPTY-2',
+        mcleodOrderId: '',
+        puCity: 'Chicago',
+        puState: 'IL',
+        delCity: 'Dallas',
+        delState: 'TX',
+        rate: 1000,
+        miles: 600,
+      });
+    expect(emptyTwo.status).toBe(201);
+  });
+
+  it('DELETE /api/customer-freight/loads/dev/all removes all loads in non-production environments', async () => {
+    await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'LD-DEV-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        delCity: 'Dallas',
+        delState: 'TX',
+        rate: 1200,
+        miles: 600,
+      });
+    await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'LD-DEV-2',
+        puCity: 'Chicago',
+        puState: 'IL',
+        delCity: 'Dallas',
+        delState: 'TX',
+        rate: 1200,
+        miles: 600,
+      });
+
+    const clearResponse = await ctx.request
+      .delete('/api/customer-freight/loads/dev/all')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(clearResponse.status).toBe(200);
+    expect(clearResponse.body.data.deletedCount).toBe(2);
+
+    const loadsAfter = await ctx.request
+      .get('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(loadsAfter.status).toBe(200);
+    expect(loadsAfter.body.data).toHaveLength(0);
+  });
+
   it('booking and manager decision acceptance transitions to COVERED', async () => {
     const createResponse = await ctx.request
       .post('/api/customer-freight/loads')

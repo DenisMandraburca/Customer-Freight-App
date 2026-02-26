@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { LoadStatus, UserRole } from '@antigravity/shared';
 
 import type { Database, QueryExecutor } from './client.js';
+import type { DbDialect } from './dbConfig.js';
+import { ciLike, dateAsText, greatest, idEquals, sqlByDialect } from './sqlDialect.js';
 
 export class HttpError extends Error {
   readonly statusCode: number;
@@ -240,6 +242,16 @@ function calculateRpm(rate: number, miles: number): number {
   return Number((safeRate / safeMiles).toFixed(2));
 }
 
+function validateMilesForStatus(miles: number, status: LoadStatus): void {
+  const safeMiles = asNumber(miles, 'miles');
+  if (safeMiles < 0) {
+    throw new HttpError('miles cannot be negative.', 400, 'VALIDATION_ERROR');
+  }
+  if (safeMiles === 0 && status !== 'TONU') {
+    throw new HttpError('Miles can be 0 only when status is TONU.', 400, 'VALIDATION_ERROR');
+  }
+}
+
 function formatAuditTimestamp(date = new Date()): string {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
@@ -270,7 +282,7 @@ function replaceLastQuoteLine(reasonLog: string | null, replacement: string): st
   return reasonLog;
 }
 
-async function ensureGreenbushCustomer(tx: QueryExecutor): Promise<string> {
+async function ensureGreenbushCustomer(tx: QueryExecutor, dialect: DbDialect): Promise<string> {
   const existing = await tx.query<{ id: string }>(
     `select id from customers where lower(name) = lower($1) limit 1`,
     ['Greenbush'],
@@ -280,65 +292,84 @@ async function ensureGreenbushCustomer(tx: QueryExecutor): Promise<string> {
     return existing.rows[0]!.id;
   }
 
+  const id = randomUUID();
+
+  if (dialect === 'sqlite') {
+    await tx.query(
+      `insert into customers (id, name, type, quote_accept)
+       values ($1, $2, $3, $4)`,
+      [id, 'Greenbush', 'Direct Customer', true],
+    );
+    return id;
+  }
+
   const created = await tx.query<{ id: string }>(
     `insert into customers (id, name, type, quote_accept)
      values ($1, $2, $3, $4)
      returning id`,
-    [randomUUID(), 'Greenbush', 'Direct Customer', true],
+    [id, 'Greenbush', 'Direct Customer', true],
   );
 
   return created.rows[0]!.id;
 }
 
-const LOAD_SELECT = `
-  select
-    l.id,
-    l.legacy_id,
-    l.created_at,
-    l.status,
-    l.account_manager_id,
-    l.customer_id,
-    l.load_ref_number,
-    l.mcleod_order_id,
-    l.requested_pickup_date::text as requested_pickup_date,
-    l.pu_city,
-    l.pu_state,
-    l.pu_zip,
-    l.pu_date::text as pu_date,
-    l.pu_appt_time,
-    l.pu_appt,
-    l.del_city,
-    l.del_state,
-    l.del_zip,
-    l.del_date::text as del_date,
-    l.del_appt_time,
-    l.del_appt,
-    l.rate,
-    l.miles,
-    l.rpm,
-    l.notes,
-    l.equipment,
-    l.assigned_dispatcher_id,
-    l.driver_name,
-    l.truck_number,
-    l.reason_log,
-    l.delay_reason,
-    l.cancel_reason,
-    l.deny_quote_reason,
-    l.other_notes,
-    l.greenbush_bank_id,
-    c.name as customer_name,
-    c.quote_accept as customer_quote_accept,
-    am.name as account_manager_name,
-    d.name as dispatcher_name
-  from loads l
-  left join customers c on c.id = l.customer_id
-  left join users am on am.id = l.account_manager_id
-  left join users d on d.id = l.assigned_dispatcher_id
-`;
+function buildLoadSelect(dialect: DbDialect): string {
+  return `
+    select
+      l.id,
+      l.legacy_id,
+      l.created_at,
+      l.status,
+      l.account_manager_id,
+      l.customer_id,
+      l.load_ref_number,
+      l.mcleod_order_id,
+      ${dateAsText(dialect, 'l.requested_pickup_date', 'requested_pickup_date')},
+      l.pu_city,
+      l.pu_state,
+      l.pu_zip,
+      ${dateAsText(dialect, 'l.pu_date', 'pu_date')},
+      l.pu_appt_time,
+      l.pu_appt,
+      l.del_city,
+      l.del_state,
+      l.del_zip,
+      ${dateAsText(dialect, 'l.del_date', 'del_date')},
+      l.del_appt_time,
+      l.del_appt,
+      l.rate,
+      l.miles,
+      l.rpm,
+      l.notes,
+      l.equipment,
+      l.assigned_dispatcher_id,
+      l.driver_name,
+      l.truck_number,
+      l.reason_log,
+      l.delay_reason,
+      l.cancel_reason,
+      l.deny_quote_reason,
+      l.other_notes,
+      l.greenbush_bank_id,
+      c.name as customer_name,
+      c.quote_accept as customer_quote_accept,
+      am.name as account_manager_name,
+      d.name as dispatcher_name
+    from loads l
+    left join customers c on c.id = l.customer_id
+    left join users am on am.id = l.account_manager_id
+    left join users d on d.id = l.assigned_dispatcher_id
+  `;
+}
 
 export class FreightRepository {
-  constructor(private readonly db: Database) {}
+  private readonly dialect: DbDialect;
+  private readonly loadSelectSql: string;
+
+  constructor(private readonly db: Database) {
+    this.dialect = db.dialect;
+    this.loadSelectSql = buildLoadSelect(this.dialect);
+  }
 
   async upsertUserFromGoogle(
     email: string,
@@ -364,23 +395,46 @@ export class FreightRepository {
         params.push(options.forcedFullLoadAccess);
       }
 
-      const updated = await this.db.query<UserRecord>(`update users set ${updates.join(', ')} where id = $1 returning *`, params);
+      const updateSql = sqlByDialect(this.dialect, {
+        postgres: `update users set ${updates.join(', ')} where id = $1 returning *`,
+        sqlite: `update users set ${updates.join(', ')} where id = $1`,
+      });
+      const updated = await this.db.query<UserRecord>(updateSql, params);
+
+      if (this.dialect === 'sqlite') {
+        const refreshed = await this.getUserById(existing.rows[0]!.id);
+        if (!refreshed) {
+          throw new HttpError('User not found.', 404, 'NOT_FOUND');
+        }
+        return refreshed;
+      }
 
       return updated.rows[0]!;
     }
 
-    const created = await this.db.query<UserRecord>(
-      `insert into users (id, email, name, role, full_load_access)
-       values ($1, $2, $3, $4, $5)
-       returning *`,
-      [
-        randomUUID(),
-        email.toLowerCase(),
-        name,
-        options?.forcedRole ?? 'VIEWER',
-        options?.forcedFullLoadAccess ?? false,
-      ],
-    );
+    const id = randomUUID();
+    const createSql = sqlByDialect(this.dialect, {
+      postgres: `insert into users (id, email, name, role, full_load_access)
+        values ($1, $2, $3, $4, $5)
+        returning *`,
+      sqlite: `insert into users (id, email, name, role, full_load_access)
+        values ($1, $2, $3, $4, $5)`,
+    });
+    const created = await this.db.query<UserRecord>(createSql, [
+      id,
+      email.toLowerCase(),
+      name,
+      options?.forcedRole ?? 'VIEWER',
+      options?.forcedFullLoadAccess ?? false,
+    ]);
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.getUserById(id);
+      if (!refreshed) {
+        throw new HttpError('User not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed;
+    }
 
     return created.rows[0]!;
   }
@@ -401,42 +455,79 @@ export class FreightRepository {
   }
 
   async listCustomers(): Promise<CustomerRecord[]> {
-    const result = await this.db.query<CustomerRecord>(
-      `select
-         c.*,
-         count(l.id) filter (where l.status in ('DELIVERED', 'BROKERAGE'))::int as total_delivered,
-         coalesce(sum(case when l.status in ('DELIVERED', 'BROKERAGE') then l.rate else 0 end), 0)::numeric(12,2) as total_rate_delivered,
-         count(l.id) filter (where l.status in ('CANCELED', 'TONU'))::int as total_canceled
-       from customers c
-       left join loads l on l.customer_id = c.id
-       group by c.id
-       order by c.name asc`,
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `select
+          c.*,
+          count(l.id) filter (where l.status in ('DELIVERED', 'BROKERAGE'))::int as total_delivered,
+          coalesce(sum(case when l.status in ('DELIVERED', 'BROKERAGE') then l.rate else 0 end), 0)::numeric(12,2) as total_rate_delivered,
+          count(l.id) filter (where l.status in ('CANCELED', 'TONU'))::int as total_canceled
+        from customers c
+        left join loads l on l.customer_id = c.id
+        group by c.id
+        order by c.name asc`,
+      sqlite: `select
+          c.*,
+          coalesce(sum(case when l.status in ('DELIVERED', 'BROKERAGE') then 1 else 0 end), 0) as total_delivered,
+          coalesce(sum(case when l.status in ('DELIVERED', 'BROKERAGE') then l.rate else 0 end), 0) as total_rate_delivered,
+          coalesce(sum(case when l.status in ('CANCELED', 'TONU') then 1 else 0 end), 0) as total_canceled
+        from customers c
+        left join loads l on l.customer_id = c.id
+        group by c.id
+        order by c.name asc`,
+    });
+    const result = await this.db.query<CustomerRecord>(sql);
     return result.rows;
   }
 
   async createCustomer(payload: CustomerMutationInput): Promise<CustomerRecord> {
-    const result = await this.db.query<CustomerRecord>(
-      `insert into customers (id, name, type, quote_accept)
-       values ($1, $2, $3, $4)
-       returning *`,
-      [randomUUID(), payload.name.trim(), payload.type, payload.quoteAccept],
-    );
+    const id = randomUUID();
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `insert into customers (id, name, type, quote_accept)
+        values ($1, $2, $3, $4)
+        returning *`,
+      sqlite: `insert into customers (id, name, type, quote_accept)
+        values ($1, $2, $3, $4)`,
+    });
+    const result = await this.db.query<CustomerRecord>(sql, [id, payload.name.trim(), payload.type, payload.quoteAccept]);
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.db.query<CustomerRecord>(`select * from customers where id = $1`, [id]);
+      if (refreshed.rowCount === 0) {
+        throw new HttpError('Customer not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed.rows[0]!;
+    }
 
     return result.rows[0]!;
   }
 
   async updateCustomer(customerId: string, payload: CustomerMutationInput): Promise<CustomerRecord> {
-    const result = await this.db.query<CustomerRecord>(
-      `update customers
-       set name = $2, type = $3, quote_accept = $4
-       where id = $1
-       returning *`,
-      [customerId, payload.name.trim(), payload.type, payload.quoteAccept],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update customers
+        set name = $2, type = $3, quote_accept = $4
+        where id = $1
+        returning *`,
+      sqlite: `update customers
+        set name = $2, type = $3, quote_accept = $4
+        where id = $1`,
+    });
+    const result = await this.db.query<CustomerRecord>(sql, [
+      customerId,
+      payload.name.trim(),
+      payload.type,
+      payload.quoteAccept,
+    ]);
 
     if (result.rowCount === 0) {
       throw new HttpError('Customer not found.', 404, 'NOT_FOUND');
+    }
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.db.query<CustomerRecord>(`select * from customers where id = $1`, [customerId]);
+      if (refreshed.rowCount === 0) {
+        throw new HttpError('Customer not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed.rows[0]!;
     }
 
     return result.rows[0]!;
@@ -450,33 +541,61 @@ export class FreightRepository {
   }
 
   async createUser(payload: UserMutationInput): Promise<UserRecord> {
-    const result = await this.db.query<UserRecord>(
-      `insert into users (id, email, name, role, full_load_access)
-       values ($1, $2, $3, $4, $5)
-       returning *`,
-      [
-        randomUUID(),
-        payload.email.toLowerCase(),
-        payload.name.trim(),
-        payload.role,
-        payload.fullLoadAccess ?? false,
-      ],
-    );
+    const id = randomUUID();
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `insert into users (id, email, name, role, full_load_access)
+        values ($1, $2, $3, $4, $5)
+        returning *`,
+      sqlite: `insert into users (id, email, name, role, full_load_access)
+        values ($1, $2, $3, $4, $5)`,
+    });
+    const result = await this.db.query<UserRecord>(sql, [
+      id,
+      payload.email.toLowerCase(),
+      payload.name.trim(),
+      payload.role,
+      payload.fullLoadAccess ?? false,
+    ]);
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.getUserById(id);
+      if (!refreshed) {
+        throw new HttpError('User not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed;
+    }
 
     return result.rows[0]!;
   }
 
   async updateUser(userId: string, payload: UserMutationInput): Promise<UserRecord> {
-    const result = await this.db.query<UserRecord>(
-      `update users
-       set email = $2, name = $3, role = $4, full_load_access = $5
-       where id = $1
-       returning *`,
-      [userId, payload.email.toLowerCase(), payload.name.trim(), payload.role, payload.fullLoadAccess ?? false],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update users
+        set email = $2, name = $3, role = $4, full_load_access = $5
+        where id = $1
+        returning *`,
+      sqlite: `update users
+        set email = $2, name = $3, role = $4, full_load_access = $5
+        where id = $1`,
+    });
+    const result = await this.db.query<UserRecord>(sql, [
+      userId,
+      payload.email.toLowerCase(),
+      payload.name.trim(),
+      payload.role,
+      payload.fullLoadAccess ?? false,
+    ]);
 
     if (result.rowCount === 0) {
       throw new HttpError('User not found.', 404, 'NOT_FOUND');
+    }
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.getUserById(userId);
+      if (!refreshed) {
+        throw new HttpError('User not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed;
     }
 
     return result.rows[0]!;
@@ -490,16 +609,27 @@ export class FreightRepository {
   }
 
   async banUser(userId: string): Promise<UserRecord> {
-    const result = await this.db.query<UserRecord>(
-      `update users
-       set role = 'BANNED'
-       where id = $1
-       returning *`,
-      [userId],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update users
+        set role = 'BANNED'
+        where id = $1
+        returning *`,
+      sqlite: `update users
+        set role = 'BANNED'
+        where id = $1`,
+    });
+    const result = await this.db.query<UserRecord>(sql, [userId]);
 
     if (result.rowCount === 0) {
       throw new HttpError('User not found.', 404, 'NOT_FOUND');
+    }
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.getUserById(userId);
+      if (!refreshed) {
+        throw new HttpError('User not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed;
     }
 
     return result.rows[0]!;
@@ -522,59 +652,101 @@ export class FreightRepository {
       throw new HttpError('remainingCount must be an integer >= 0.', 400, 'VALIDATION_ERROR');
     }
 
-    const result = await this.db.query<GreenbushRecord>(
-      `insert into greenbush_bank (
-        id,
-        pickup_location,
-        destination,
-        receiving_hours,
-        price,
-        tarp,
-        remaining_count,
-        special_notes
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8)
-      returning *`,
-      [
-        randomUUID(),
-        payload.pickupLocation.trim(),
-        payload.destination.trim(),
-        payload.receivingHours?.trim() || null,
-        asNumber(payload.price, 'price'),
-        payload.tarp?.trim() || null,
-        payload.remainingCount,
-        payload.specialNotes?.trim() || null,
-      ],
-    );
+    const id = randomUUID();
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `insert into greenbush_bank (
+          id,
+          pickup_location,
+          destination,
+          receiving_hours,
+          price,
+          tarp,
+          remaining_count,
+          special_notes
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8)
+        returning *`,
+      sqlite: `insert into greenbush_bank (
+          id,
+          pickup_location,
+          destination,
+          receiving_hours,
+          price,
+          tarp,
+          remaining_count,
+          special_notes
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    });
+    const result = await this.db.query<GreenbushRecord>(sql, [
+      id,
+      payload.pickupLocation.trim(),
+      payload.destination.trim(),
+      payload.receivingHours?.trim() || null,
+      asNumber(payload.price, 'price'),
+      payload.tarp?.trim() || null,
+      payload.remainingCount,
+      payload.specialNotes?.trim() || null,
+    ]);
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.db.query<GreenbushRecord>(
+        `select * from greenbush_bank where id = $1`,
+        [id],
+      );
+      if (refreshed.rowCount === 0) {
+        throw new HttpError('Greenbush record not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed.rows[0]!;
+    }
 
     return result.rows[0]!;
   }
 
   async updateGreenbush(id: string, payload: GreenbushMutationInput): Promise<GreenbushRecord> {
-    const result = await this.db.query<GreenbushRecord>(
-      `update greenbush_bank
-       set pickup_location = $2,
-           destination = $3,
-           receiving_hours = $4,
-           price = $5,
-           tarp = $6,
-           remaining_count = $7,
-           special_notes = $8
-       where id = $1
-       returning *`,
-      [
-        id,
-        payload.pickupLocation.trim(),
-        payload.destination.trim(),
-        payload.receivingHours?.trim() || null,
-        asNumber(payload.price, 'price'),
-        payload.tarp?.trim() || null,
-        payload.remainingCount,
-        payload.specialNotes?.trim() || null,
-      ],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update greenbush_bank
+        set pickup_location = $2,
+            destination = $3,
+            receiving_hours = $4,
+            price = $5,
+            tarp = $6,
+            remaining_count = $7,
+            special_notes = $8
+        where id = $1
+        returning *`,
+      sqlite: `update greenbush_bank
+        set pickup_location = $2,
+            destination = $3,
+            receiving_hours = $4,
+            price = $5,
+            tarp = $6,
+            remaining_count = $7,
+            special_notes = $8
+        where id = $1`,
+    });
+    const result = await this.db.query<GreenbushRecord>(sql, [
+      id,
+      payload.pickupLocation.trim(),
+      payload.destination.trim(),
+      payload.receivingHours?.trim() || null,
+      asNumber(payload.price, 'price'),
+      payload.tarp?.trim() || null,
+      payload.remainingCount,
+      payload.specialNotes?.trim() || null,
+    ]);
 
     if (result.rowCount === 0) {
       throw new HttpError('Greenbush record not found.', 404, 'NOT_FOUND');
+    }
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.db.query<GreenbushRecord>(
+        `select * from greenbush_bank where id = $1`,
+        [id],
+      );
+      if (refreshed.rowCount === 0) {
+        throw new HttpError('Greenbush record not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed.rows[0]!;
     }
 
     return result.rows[0]!;
@@ -588,16 +760,30 @@ export class FreightRepository {
   }
 
   async incrementGreenbush(greenbushId: string): Promise<GreenbushRecord> {
-    const result = await this.db.query<GreenbushRecord>(
-      `update greenbush_bank
-       set remaining_count = remaining_count + 1
-       where id = $1
-       returning *`,
-      [greenbushId],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update greenbush_bank
+        set remaining_count = remaining_count + 1
+        where id = $1
+        returning *`,
+      sqlite: `update greenbush_bank
+        set remaining_count = remaining_count + 1
+        where id = $1`,
+    });
+    const result = await this.db.query<GreenbushRecord>(sql, [greenbushId]);
 
     if (result.rowCount === 0) {
       throw new HttpError('Greenbush record not found.', 404, 'NOT_FOUND');
+    }
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.db.query<GreenbushRecord>(
+        `select * from greenbush_bank where id = $1`,
+        [greenbushId],
+      );
+      if (refreshed.rowCount === 0) {
+        throw new HttpError('Greenbush record not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed.rows[0]!;
     }
 
     return result.rows[0]!;
@@ -620,30 +806,53 @@ export class FreightRepository {
           throw new HttpError('remainingCount must be an integer >= 0.', 400, 'VALIDATION_ERROR');
         }
 
-        const result = await tx.query<GreenbushRecord>(
-          `insert into greenbush_bank (
-             id,
-             pickup_location,
-             destination,
-             receiving_hours,
-             price,
-             tarp,
-             remaining_count,
-             special_notes
-           ) values ($1,$2,$3,$4,$5,$6,$7,$8)
-           returning *`,
-          [
-            randomUUID(),
-            row.pickupLocation.trim(),
-            row.destination.trim(),
-            row.receivingHours?.trim() || null,
-            asNumber(row.price, 'price'),
-            row.tarp?.trim() || null,
-            row.remainingCount,
-            row.specialNotes?.trim() || null,
-          ],
-        );
-        inserted.push(result.rows[0]!);
+        const id = randomUUID();
+        const sql = sqlByDialect(this.dialect, {
+          postgres: `insert into greenbush_bank (
+              id,
+              pickup_location,
+              destination,
+              receiving_hours,
+              price,
+              tarp,
+              remaining_count,
+              special_notes
+            ) values ($1,$2,$3,$4,$5,$6,$7,$8)
+            returning *`,
+          sqlite: `insert into greenbush_bank (
+              id,
+              pickup_location,
+              destination,
+              receiving_hours,
+              price,
+              tarp,
+              remaining_count,
+              special_notes
+            ) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        });
+        const result = await tx.query<GreenbushRecord>(sql, [
+          id,
+          row.pickupLocation.trim(),
+          row.destination.trim(),
+          row.receivingHours?.trim() || null,
+          asNumber(row.price, 'price'),
+          row.tarp?.trim() || null,
+          row.remainingCount,
+          row.specialNotes?.trim() || null,
+        ]);
+
+        if (this.dialect === 'sqlite') {
+          const refreshed = await tx.query<GreenbushRecord>(
+            `select * from greenbush_bank where id = $1`,
+            [id],
+          );
+          if (refreshed.rowCount === 0) {
+            throw new HttpError('Greenbush record not found.', 404, 'NOT_FOUND');
+          }
+          inserted.push(refreshed.rows[0]!);
+        } else {
+          inserted.push(result.rows[0]!);
+        }
       }
 
       return inserted;
@@ -652,7 +861,7 @@ export class FreightRepository {
 
   async getLoadById(loadId: string): Promise<LoadRecord | null> {
     const result = await this.db.query<LoadRecord>(
-      `${LOAD_SELECT}
+      `${this.loadSelectSql}
        where l.id = $1
        limit 1`,
       [loadId],
@@ -668,11 +877,42 @@ export class FreightRepository {
     }
 
     const result = await this.db.query<LoadRecord>(
-      `${LOAD_SELECT}
+      `${this.loadSelectSql}
        where l.load_ref_number = $1
        order by l.created_at desc
        limit 1`,
       [trimmed],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async findLatestLoadByMcleodOrderId(
+    mcleodOrderId: string,
+    options?: { excludeLoadId?: string; executor?: QueryExecutor },
+  ): Promise<LoadRecord | null> {
+    const trimmed = mcleodOrderId.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const executor = options?.executor ?? this.db;
+    const params: unknown[] = [trimmed];
+    let excludeClause = '';
+    if (options?.excludeLoadId) {
+      params.push(options.excludeLoadId);
+      excludeClause = `and l.id <> $${params.length}`;
+    }
+
+    const result = await executor.query<LoadRecord>(
+      `${this.loadSelectSql}
+       where l.mcleod_order_id is not null
+         and trim(l.mcleod_order_id) <> ''
+         and lower(trim(l.mcleod_order_id)) = lower(trim($1))
+         ${excludeClause}
+       order by l.created_at desc
+       limit 1`,
+      params,
     );
 
     return result.rows[0] ?? null;
@@ -691,21 +931,27 @@ export class FreightRepository {
       const customerTerm = filters.customer.trim();
       params.push(customerTerm);
       params.push(`%${customerTerm}%`);
-      clauses.push(`(c.id::text = $${params.length - 1} or c.name ilike $${params.length})`);
+      const idIndex = params.length - 1;
+      const nameIndex = params.length;
+      clauses.push(`(${idEquals(this.dialect, 'c.id', idIndex)} or ${ciLike(this.dialect, 'c.name', nameIndex)})`);
     }
 
     if (filters.dispatcher) {
       const dispatcherTerm = filters.dispatcher.trim();
       params.push(dispatcherTerm);
       params.push(`%${dispatcherTerm}%`);
-      clauses.push(`(d.id::text = $${params.length - 1} or d.name ilike $${params.length})`);
+      const idIndex = params.length - 1;
+      const nameIndex = params.length;
+      clauses.push(`(${idEquals(this.dialect, 'd.id', idIndex)} or ${ciLike(this.dialect, 'd.name', nameIndex)})`);
     }
 
     if (filters.accountManager) {
       const accountManagerTerm = filters.accountManager.trim();
       params.push(accountManagerTerm);
       params.push(`%${accountManagerTerm}%`);
-      clauses.push(`(am.id::text = $${params.length - 1} or am.name ilike $${params.length})`);
+      const idIndex = params.length - 1;
+      const nameIndex = params.length;
+      clauses.push(`(${idEquals(this.dialect, 'am.id', idIndex)} or ${ciLike(this.dialect, 'am.name', nameIndex)})`);
     }
 
     if (filters.from) {
@@ -726,7 +972,7 @@ export class FreightRepository {
     const where = clauses.length > 0 ? `where ${clauses.join(' and ')}` : '';
 
     const result = await this.db.query<LoadRecord>(
-      `${LOAD_SELECT}
+      `${this.loadSelectSql}
        ${where}
        order by l.created_at desc`,
       params,
@@ -738,16 +984,25 @@ export class FreightRepository {
   async createLoad(input: CreateLoadInput): Promise<LoadRecord> {
     const rate = asNumber(input.rate, 'rate');
     const miles = asNumber(input.miles, 'miles');
-    const rpm = calculateRpm(rate, miles);
     const loadRefNumber = input.loadRefNumber?.trim() || `AUTO-${Date.now()}`;
 
     let status: LoadStatus = input.status ?? 'AVAILABLE';
-    if (status !== 'BROKERAGE' && input.assignedDispatcherId) {
+    if (input.status === undefined && status !== 'BROKERAGE' && input.assignedDispatcherId) {
       const dispatcher = await this.getUserById(input.assignedDispatcherId);
       if (!dispatcher || dispatcher.role !== 'DISPATCHER') {
         throw new HttpError('assignedDispatcherId must belong to a dispatcher.', 400, 'VALIDATION_ERROR');
       }
       status = 'COVERED';
+    }
+    validateMilesForStatus(miles, status);
+    const rpm = calculateRpm(rate, miles);
+
+    const mcleodOrderId = input.mcleodOrderId?.trim() || null;
+    if (mcleodOrderId) {
+      const duplicate = await this.findLatestLoadByMcleodOrderId(mcleodOrderId);
+      if (duplicate) {
+        throw new HttpError(`McLeod # already exists on Load: ${duplicate.id}`, 409, 'VALIDATION_ERROR');
+      }
     }
 
     let puApptTime = input.puApptTime?.trim() || null;
@@ -806,7 +1061,7 @@ export class FreightRepository {
         input.accountManagerId,
         input.customerId,
         loadRefNumber,
-        input.mcleodOrderId?.trim() || null,
+        mcleodOrderId,
         input.puCity.trim(),
         input.puState.trim().toUpperCase(),
         input.puZip?.trim() || null,
@@ -847,24 +1102,32 @@ export class FreightRepository {
     if (!existing) {
       throw new HttpError('Load not found.', 404, 'NOT_FOUND');
     }
-    const update = await this.db.query<{ id: string }>(
-      `update loads
-       set status = 'PENDING_APPROVAL',
-           assigned_dispatcher_id = $2,
-           truck_number = $3,
-           driver_name = $4,
-           reason_log = $5
-       where id = $1
-         and status = 'AVAILABLE'
-       returning id`,
-      [
-        input.loadId,
-        input.dispatcherId,
-        input.truckNumber.trim(),
-        input.driverName.trim(),
-        appendReasonLine(existing.reason_log, `Booking request submitted by ${input.actorName}`),
-      ],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update loads
+        set status = 'PENDING_APPROVAL',
+            assigned_dispatcher_id = $2,
+            truck_number = $3,
+            driver_name = $4,
+            reason_log = $5
+        where id = $1
+          and status = 'AVAILABLE'
+        returning id`,
+      sqlite: `update loads
+        set status = 'PENDING_APPROVAL',
+            assigned_dispatcher_id = $2,
+            truck_number = $3,
+            driver_name = $4,
+            reason_log = $5
+        where id = $1
+          and status = 'AVAILABLE'`,
+    });
+    const update = await this.db.query<{ id: string }>(sql, [
+      input.loadId,
+      input.dispatcherId,
+      input.truckNumber.trim(),
+      input.driverName.trim(),
+      appendReasonLine(existing.reason_log, `Booking request submitted by ${input.actorName}`),
+    ]);
 
     if (update.rowCount === 0) {
       throw new HttpError('Load is no longer available for booking.', 409, 'ALREADY_BOOKED');
@@ -897,22 +1160,29 @@ export class FreightRepository {
     }
 
     const reason = `Quote: Requested Pickup Date Change to ${input.pickupDate.trim()}`;
-    const update = await this.db.query<{ id: string }>(
-      `update loads
-       set status = 'QUOTE_SUBMITTED',
-           assigned_dispatcher_id = $2,
-           requested_pickup_date = $3,
-           reason_log = $4
-       where id = $1
-         and status = 'AVAILABLE'
-       returning id`,
-      [
-        input.loadId,
-        input.dispatcherId,
-        input.pickupDate.trim(),
-        appendReasonLine(existing.reason_log, `${reason} by ${input.actorName}`),
-      ],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update loads
+        set status = 'QUOTE_SUBMITTED',
+            assigned_dispatcher_id = $2,
+            requested_pickup_date = $3,
+            reason_log = $4
+        where id = $1
+          and status = 'AVAILABLE'
+        returning id`,
+      sqlite: `update loads
+        set status = 'QUOTE_SUBMITTED',
+            assigned_dispatcher_id = $2,
+            requested_pickup_date = $3,
+            reason_log = $4
+        where id = $1
+          and status = 'AVAILABLE'`,
+    });
+    const update = await this.db.query<{ id: string }>(sql, [
+      input.loadId,
+      input.dispatcherId,
+      input.pickupDate.trim(),
+      appendReasonLine(existing.reason_log, `${reason} by ${input.actorName}`),
+    ]);
 
     if (update.rowCount === 0) {
       throw new HttpError('Load is no longer available for quote submission.', 409, 'ALREADY_BOOKED');
@@ -942,16 +1212,28 @@ export class FreightRepository {
       `Status -> ${status} by ${actorName}${reason?.trim() ? `: ${reason.trim()}` : ''}`,
     );
 
-    const result = await this.db.query<{ id: string }>(
-      `update loads
-       set status = $2::load_status,
-           reason_log = $3,
-           delay_reason = case when $2::load_status = 'DELAYED'::load_status then $4 else delay_reason end,
-           cancel_reason = case when $2::load_status in ('CANCELED'::load_status, 'TONU'::load_status) then $5 else cancel_reason end
-       where id = $1
-       returning id`,
-      [loadId, status, nextReasonLog, reason?.trim() || null, reason?.trim() || null],
-    );
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update loads
+        set status = $2::load_status,
+            reason_log = $3,
+            delay_reason = case when $2::load_status = 'DELAYED'::load_status then $4 else delay_reason end,
+            cancel_reason = case when $2::load_status in ('CANCELED'::load_status, 'TONU'::load_status) then $5 else cancel_reason end
+        where id = $1
+        returning id`,
+      sqlite: `update loads
+        set status = $2,
+            reason_log = $3,
+            delay_reason = case when $2 = 'DELAYED' then $4 else delay_reason end,
+            cancel_reason = case when $2 in ('CANCELED', 'TONU') then $5 else cancel_reason end
+        where id = $1`,
+    });
+    const result = await this.db.query<{ id: string }>(sql, [
+      loadId,
+      status,
+      nextReasonLog,
+      reason?.trim() || null,
+      reason?.trim() || null,
+    ]);
 
     if (result.rowCount === 0) {
       throw new HttpError('Load status update failed.', 500, 'INTERNAL_ERROR');
@@ -979,7 +1261,7 @@ export class FreightRepository {
            l.id,
            l.status,
            l.greenbush_bank_id,
-           l.requested_pickup_date::text as requested_pickup_date,
+           ${dateAsText(this.dialect, 'l.requested_pickup_date', 'requested_pickup_date')},
            l.reason_log,
            c.name as customer_name
          from loads l
@@ -1001,6 +1283,17 @@ export class FreightRepository {
 
         const requestedPickupDate = input.requestedPickupDate?.trim() || load.requested_pickup_date || null;
         const newDeliveryDate = input.newDeliveryDate?.trim() || null;
+        const nextMcleodOrderId = input.mcleodOrderId?.trim() || null;
+
+        if (nextMcleodOrderId) {
+          const duplicate = await this.findLatestLoadByMcleodOrderId(nextMcleodOrderId, {
+            excludeLoadId: input.loadId,
+            executor: tx,
+          });
+          if (duplicate) {
+            throw new HttpError(`McLeod # already exists on Load: ${duplicate.id}`, 409, 'VALIDATION_ERROR');
+          }
+        }
 
         if (load.status === 'QUOTE_SUBMITTED' && !newDeliveryDate) {
           throw new HttpError('newDeliveryDate is required when accepting a quote-submitted load.', 400, 'VALIDATION_ERROR');
@@ -1014,30 +1307,38 @@ export class FreightRepository {
           reasonLog = appendReasonLine(reasonLog, `Booking approved by ${input.actorName}`);
         }
 
-        await tx.query(
-          `update loads
-           set status = 'COVERED'::load_status,
-               pu_date = coalesce($3::date, pu_date),
-               del_date = coalesce($4::date, del_date),
-               load_ref_number = case when $5::text is not null and $5::text <> '' then $5::text else load_ref_number end,
-               mcleod_order_id = case when $6::text is not null and $6::text <> '' then $6::text else mcleod_order_id end,
-               reason_log = $2
-           where id = $1`,
-          [
-            input.loadId,
-            reasonLog,
-            requestedPickupDate,
-            newDeliveryDate,
-            input.loadRefNumber?.trim() || null,
-            input.mcleodOrderId?.trim() || null,
-          ],
-        );
+        const updateSql = sqlByDialect(this.dialect, {
+          postgres: `update loads
+            set status = 'COVERED'::load_status,
+                pu_date = coalesce($3::date, pu_date),
+                del_date = coalesce($4::date, del_date),
+                load_ref_number = case when $5::text is not null and $5::text <> '' then $5::text else load_ref_number end,
+                mcleod_order_id = case when $6::text is not null and $6::text <> '' then $6::text else mcleod_order_id end,
+                reason_log = $2
+            where id = $1`,
+          sqlite: `update loads
+            set status = 'COVERED',
+                pu_date = coalesce($3, pu_date),
+                del_date = coalesce($4, del_date),
+                load_ref_number = case when $5 is not null and $5 <> '' then $5 else load_ref_number end,
+                mcleod_order_id = case when $6 is not null and $6 <> '' then $6 else mcleod_order_id end,
+                reason_log = $2
+            where id = $1`,
+        });
+        await tx.query(updateSql, [
+          input.loadId,
+          reasonLog,
+          requestedPickupDate,
+          newDeliveryDate,
+          input.loadRefNumber?.trim() || null,
+          nextMcleodOrderId,
+        ]);
 
         if (load.greenbush_bank_id && load.customer_name === 'Greenbush') {
           await tx.query(
             `update greenbush_bank
-             set remaining_count = greatest(remaining_count - 1, 0),
-                 reserved_count = greatest(reserved_count - 1, 0)
+             set remaining_count = ${greatest(this.dialect, 'remaining_count - 1', '0')},
+                 reserved_count = ${greatest(this.dialect, 'reserved_count - 1', '0')}
              where id = $1`,
             [load.greenbush_bank_id],
           );
@@ -1050,7 +1351,7 @@ export class FreightRepository {
         if (load.greenbush_bank_id) {
           await tx.query(
             `update greenbush_bank
-             set reserved_count = greatest(reserved_count - 1, 0)
+             set reserved_count = ${greatest(this.dialect, 'reserved_count - 1', '0')}
              where id = $1`,
             [load.greenbush_bank_id],
           );
@@ -1061,26 +1362,35 @@ export class FreightRepository {
           throw new HttpError('denyReason is required when denying a quote or booking.', 400, 'VALIDATION_ERROR');
         }
 
-        await tx.query(
-          `update loads
-           set status = 'AVAILABLE'::load_status,
-               assigned_dispatcher_id = null,
-               truck_number = null,
-               driver_name = null,
-               requested_pickup_date = null,
-               deny_quote_reason = $2,
-               reason_log = $3
-           where id = $1`,
-          [
-            input.loadId,
-            denyReason,
-            appendReasonLine(load.reason_log, `Quote denied by ${input.actorName}: ${denyReason}`),
-          ],
-        );
+        const denySql = sqlByDialect(this.dialect, {
+          postgres: `update loads
+            set status = 'AVAILABLE'::load_status,
+                assigned_dispatcher_id = null,
+                truck_number = null,
+                driver_name = null,
+                requested_pickup_date = null,
+                deny_quote_reason = $2,
+                reason_log = $3
+            where id = $1`,
+          sqlite: `update loads
+            set status = 'AVAILABLE',
+                assigned_dispatcher_id = null,
+                truck_number = null,
+                driver_name = null,
+                requested_pickup_date = null,
+                deny_quote_reason = $2,
+                reason_log = $3
+            where id = $1`,
+        });
+        await tx.query(denySql, [
+          input.loadId,
+          denyReason,
+          appendReasonLine(load.reason_log, `Quote denied by ${input.actorName}: ${denyReason}`),
+        ]);
       }
 
       const refreshed = await tx.query<LoadRecord>(
-        `${LOAD_SELECT}
+        `${this.loadSelectSql}
          where l.id = $1
          limit 1`,
         [input.loadId],
@@ -1096,14 +1406,18 @@ export class FreightRepository {
 
   async createGreenbushQuote(input: GreenbushQuoteInput): Promise<LoadRecord> {
     return this.db.withTransaction(async (tx) => {
-      const gb = await tx.query<GreenbushRecord>(
-        `update greenbush_bank
-         set reserved_count = reserved_count + 1
-         where id = $1
-           and (remaining_count - reserved_count) > 0
-         returning *`,
-        [input.greenbushId],
-      );
+      const updateSql = sqlByDialect(this.dialect, {
+        postgres: `update greenbush_bank
+          set reserved_count = reserved_count + 1
+          where id = $1
+            and (remaining_count - reserved_count) > 0
+          returning *`,
+        sqlite: `update greenbush_bank
+          set reserved_count = reserved_count + 1
+          where id = $1
+            and (remaining_count - reserved_count) > 0`,
+      });
+      const gb = await tx.query<GreenbushRecord>(updateSql, [input.greenbushId]);
 
       if (gb.rowCount === 0) {
         const exists = await tx.query<{ id: string }>('select id from greenbush_bank where id = $1', [input.greenbushId]);
@@ -1113,9 +1427,12 @@ export class FreightRepository {
         throw new HttpError('No remaining Greenbush capacity for this job.', 409, 'GREENBUSH_UNAVAILABLE');
       }
 
-      const greenbush = gb.rows[0]!;
+      const greenbush =
+        this.dialect === 'sqlite'
+          ? (await tx.query<GreenbushRecord>('select * from greenbush_bank where id = $1', [input.greenbushId])).rows[0]!
+          : gb.rows[0]!;
 
-      const customerId = await ensureGreenbushCustomer(tx);
+      const customerId = await ensureGreenbushCustomer(tx, this.dialect);
 
       const loadId = randomUUID();
       const rate = Number(greenbush.price);
@@ -1173,7 +1490,7 @@ export class FreightRepository {
       );
 
       const refreshed = await tx.query<LoadRecord>(
-        `${LOAD_SELECT}
+        `${this.loadSelectSql}
          where l.id = $1`,
         [loadId],
       );
@@ -1225,6 +1542,23 @@ export class FreightRepository {
       throw new HttpError('Load not found.', 404, 'NOT_FOUND');
     }
 
+    if (updates.miles !== undefined || updates.status !== undefined) {
+      const effectiveStatus = updates.status ?? current.status;
+      const effectiveMiles = updates.miles !== undefined ? asNumber(updates.miles, 'miles') : Number(current.miles);
+      validateMilesForStatus(effectiveMiles, effectiveStatus);
+    }
+
+    if (updates.mcleodOrderId !== undefined) {
+      const nextMcleod = updates.mcleodOrderId?.trim() || null;
+      const currentMcleod = current.mcleod_order_id?.trim() || null;
+      if (nextMcleod && nextMcleod !== currentMcleod) {
+        const duplicate = await this.findLatestLoadByMcleodOrderId(nextMcleod, { excludeLoadId: loadId });
+        if (duplicate) {
+          throw new HttpError(`McLeod # already exists on Load: ${duplicate.id}`, 409, 'VALIDATION_ERROR');
+        }
+      }
+    }
+
     if (
       updates.assignedDispatcherId !== undefined &&
       updates.assignedDispatcherId !== null &&
@@ -1250,10 +1584,11 @@ export class FreightRepository {
     const assignments = entries.map(([column], index) => `${column} = $${index + 2}`);
     const params = [loadId, ...entries.map(([, value]) => value)];
 
-    const result = await this.db.query<{ id: string }>(
-      `update loads set ${assignments.join(', ')} where id = $1 returning id`,
-      params,
-    );
+    const updateSql = sqlByDialect(this.dialect, {
+      postgres: `update loads set ${assignments.join(', ')} where id = $1 returning id`,
+      sqlite: `update loads set ${assignments.join(', ')} where id = $1`,
+    });
+    const result = await this.db.query<{ id: string }>(updateSql, params);
 
     if (result.rowCount === 0) {
       throw new HttpError('Load not found.', 404, 'NOT_FOUND');
@@ -1349,15 +1684,23 @@ export class FreightRepository {
   }
 
   async deleteLoad(loadId: string): Promise<void> {
-    const result = await this.db.query(`delete from loads where id = $1`, [loadId]);
-    if (result.rowCount === 0) {
-      throw new HttpError('Load not found.', 404, 'NOT_FOUND');
-    }
+    // Idempotent delete: deleting an already-removed load is treated as success.
+    await this.db.query(`delete from loads where id = $1`, [loadId]);
+  }
+
+  async deleteAllLoads(): Promise<number> {
+    return this.db.withTransaction(async (tx) => {
+      const countResult = await tx.query<{ count: number | string }>(`select count(*) as count from loads`);
+      const deletedCount = Number(countResult.rows[0]?.count ?? 0);
+      await tx.query(`delete from loads`);
+      await tx.query(`update greenbush_bank set reserved_count = 0`);
+      return deletedCount;
+    });
   }
 
   async bootstrapDefaults(): Promise<void> {
     await this.db.withTransaction(async (tx) => {
-      await ensureGreenbushCustomer(tx);
+      await ensureGreenbushCustomer(tx, this.dialect);
     });
   }
 }

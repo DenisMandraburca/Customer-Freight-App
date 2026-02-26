@@ -1,11 +1,12 @@
 import type { SessionUser } from '@/types/models';
+import { redirectToPortalLogin } from '@/config/runtime';
 
 import { unwrap } from './http';
 
 const API_BASE = '/api/customer-freight';
 
 export function startPortalAuth(): void {
-  window.location.href = '/apps/hub/login';
+  redirectToPortalLogin();
 }
 
 export async function getCurrentSession(): Promise<SessionUser> {

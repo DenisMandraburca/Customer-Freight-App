@@ -3,9 +3,9 @@ import { fileURLToPath, URL } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [vue()],
-  base: '/apps/customer-freight/',
+  base: command === 'serve' ? '/' : '/apps/customer-freight/',
   server: {
     port: 5174,
     proxy: {
@@ -20,4 +20,4 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-});
+}));

@@ -25,7 +25,7 @@
 
       <section class="glass-panel mt-8 rounded-2xl border border-zinc-300/70 p-6 dark:border-zinc-700/70 md:mt-0">
         <h2 class="text-lg font-semibold">Portal Login</h2>
-        <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+        <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
           Authentication is managed by the AFC portal. Continue to the hub login page.
         </p>
         <button

@@ -13,9 +13,11 @@
   "dependencies": {
     "@antigravity/shared": "0.1.0",
     "@tanstack/vue-query": "^5.85.5",
+    "echarts": "^5.6.0",
     "lucide-vue-next": "^0.575.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.17",
+    "vue-echarts": "^7.0.3",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {

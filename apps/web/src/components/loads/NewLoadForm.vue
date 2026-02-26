@@ -1,7 +1,7 @@
 <template>
   <section class="glass-panel rounded-2xl p-4">
     <div v-if="!alwaysExpanded" class="flex items-center justify-between">
-      <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">New Load</h3>
+      <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">New Load</h3>
       <button
         type="button"
         class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -21,14 +21,14 @@
     >
       <form v-if="formVisible" class="mt-4 flex flex-col gap-4 lg:flex-row" @submit.prevent="submit('POST')">
         <div class="flex-1 space-y-3">
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Customer
             <select v-model="state.customerId" required class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900">
               <option value="" disabled>Select Customer</option>
               <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
             </select>
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Load Ref #
             <input
               v-model="state.loadRefNumber"
@@ -37,11 +37,11 @@
             />
           </label>
           <p v-if="duplicateWarning" class="text-xs text-amber-600 dark:text-amber-400">{{ duplicateWarning }}</p>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             McLeod #
             <input v-model="state.mcleodOrderId" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Notes
             <textarea v-model="state.notes" rows="3" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
@@ -50,7 +50,7 @@
         <div class="mx-1 hidden w-px self-stretch border-l border-dashed border-zinc-300 dark:border-zinc-700 lg:block"></div>
 
         <div class="flex-1 space-y-3">
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             PU Location
             <input
               v-model="state.puLocation"
@@ -60,7 +60,7 @@
             />
           </label>
           <p v-if="errors.puLocation" class="text-xs text-rose-600 dark:text-rose-400">{{ errors.puLocation }}</p>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             PU ZIP
             <input
               v-model="state.puZip"
@@ -69,11 +69,11 @@
               class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
             />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Pickup Date
             <input v-model="state.puDate" required type="date" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="flex items-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
             <input v-model="state.puAppt" type="checkbox" />
             APPT
           </label>
@@ -85,7 +85,7 @@
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-2"
           >
-            <label v-if="state.puAppt" class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            <label v-if="state.puAppt" class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
               PU Appt Time
               <input
                 v-model="state.puApptTime"
@@ -101,7 +101,7 @@
         <div class="mx-1 hidden w-px self-stretch border-l border-dashed border-zinc-300 dark:border-zinc-700 lg:block"></div>
 
         <div class="flex-1 space-y-3">
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             DEL Location
             <input
               v-model="state.delLocation"
@@ -111,7 +111,7 @@
             />
           </label>
           <p v-if="errors.delLocation" class="text-xs text-rose-600 dark:text-rose-400">{{ errors.delLocation }}</p>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             DEL ZIP
             <input
               v-model="state.delZip"
@@ -120,12 +120,12 @@
               class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
             />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Delivery Date
             <input v-model="state.delDate" required type="date" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
           <p v-if="errors.delDate" class="text-xs text-rose-600 dark:text-rose-400">{{ errors.delDate }}</p>
-          <label class="flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="flex items-center gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
             <input v-model="state.delAppt" type="checkbox" />
             APPT
           </label>
@@ -137,7 +137,7 @@
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-2"
           >
-            <label v-if="state.delAppt" class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            <label v-if="state.delAppt" class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
               DEL Appt Time
               <input
                 v-model="state.delApptTime"
@@ -153,11 +153,11 @@
         <div class="mx-1 hidden w-px self-stretch border-l border-dashed border-zinc-300 dark:border-zinc-700 lg:block"></div>
 
         <div class="flex-1 space-y-3">
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Rate ($)
             <input v-model.number="state.rate" required type="number" min="0.01" step="0.01" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Miles
             <input v-model.number="state.miles" required type="number" min="1" step="1" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
@@ -174,27 +174,27 @@
           </button>
 
           <div v-if="state.showDispatcher" class="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900/60">
-            <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
               Dispatcher
               <select v-model="state.assignedDispatcherId" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900">
                 <option value="">Select Dispatcher</option>
                 <option v-for="dispatcher in dispatcherOptions" :key="dispatcher.id" :value="dispatcher.id">{{ dispatcher.name }}</option>
               </select>
             </label>
-            <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
               Driver Name
               <input v-model="state.driverName" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
             </label>
-            <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+            <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
               Truck #
               <input v-model="state.truckNumber" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
             </label>
-            <button type="button" class="text-xs font-semibold text-zinc-500 underline" @click="clearDispatcher">Clear</button>
+            <button type="button" class="text-xs font-semibold text-zinc-700 underline" @click="clearDispatcher">Clear</button>
           </div>
 
           <button type="submit" class="w-full rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800">Post Load</button>
           <button type="button" class="w-full rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700" @click="submit('BROKERAGE')">Brokerage</button>
-          <p v-if="selectedDispatcherName" class="text-xs text-zinc-500 dark:text-zinc-400">
+          <p v-if="selectedDispatcherName" class="text-xs text-zinc-700 dark:text-zinc-400">
             Will be assigned to: {{ selectedDispatcherName }}
           </p>
         </div>

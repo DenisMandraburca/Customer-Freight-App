@@ -27,7 +27,7 @@ const createLoadSchema = z.object({
   delApptTime: z.string().trim().nullable().optional(),
   delAppt: z.boolean().optional(),
   rate: z.number().finite().positive(),
-  miles: z.number().finite().positive(),
+  miles: z.number().finite().nonnegative(),
   notes: z.string().trim().nullable().optional(),
   assignedDispatcherId: z.string().uuid().nullable().optional(),
   driverName: z.string().trim().nullable().optional(),
@@ -90,7 +90,7 @@ const updateLoadSchema = z.object({
   delApptTime: z.string().trim().nullable().optional(),
   delAppt: z.boolean().optional(),
   rate: z.number().finite().positive().optional(),
-  miles: z.number().finite().positive().optional(),
+  miles: z.number().finite().nonnegative().optional(),
   notes: z.string().trim().nullable().optional(),
   status: loadStatusSchema.optional(),
   assignedDispatcherId: z.string().uuid().nullable().optional(),
@@ -176,6 +176,34 @@ function parseBoolean(value: string | undefined): boolean {
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y';
 }
 
+function parseImportNumber(value: string | undefined): number {
+  const normalized = (value ?? '').trim().replace(/[$,\s]/g, '');
+  return Number(normalized);
+}
+
+function normalizeLoadStatusInput(raw: string): LoadStatus | undefined {
+  const normalized = raw
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized === 'PENDING') {
+    return 'PENDING_APPROVAL';
+  }
+  return LOAD_STATUSES.includes(normalized as LoadStatus) ? (normalized as LoadStatus) : undefined;
+}
+
+function validateMilesForStatus(miles: number, status: LoadStatus): void {
+  if (!Number.isFinite(miles) || miles < 0) {
+    throw new HttpError('Miles must be a non-negative number.', 400, 'VALIDATION_ERROR');
+  }
+  if (miles === 0 && status !== 'TONU') {
+    throw new HttpError('Miles can be 0 only when status is TONU.', 400, 'VALIDATION_ERROR');
+  }
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -244,6 +272,7 @@ export function loadsRouter(repository: FreightRepository): Router {
       }
 
       const status = parsed.status === 'BROKERAGE' ? 'BROKERAGE' : undefined;
+      validateMilesForStatus(parsed.miles, status ?? 'AVAILABLE');
 
       const load = await repository.createLoad({
         customerId: parsed.customerId,
@@ -288,21 +317,30 @@ export function loadsRouter(repository: FreightRepository): Router {
       const customerRows = await repository.listCustomers();
       const customersByName = new Map(customerRows.map((customer) => [customer.name.trim().toLowerCase(), customer.id]));
 
+      const userRows = await repository.listUsers();
+      const usersByName = new Map(userRows.map((user) => [user.name.trim().toLowerCase(), user.id]));
+
       const errors: BulkImportError[] = [];
       let importedCount = 0;
 
       for (const [index, row] of parsed.rows.entries()) {
         try {
-          const customerName = (row.Customer ?? row.customer ?? '').trim();
+          const getRowVal = (keys: string[], ...search: string[]) => {
+            const key = keys.find((k) => search.some((s) => s.toLowerCase() === k.toLowerCase().trim()));
+            return key ? row[key] : undefined;
+          };
+          const rowKeys = Object.keys(row);
+
+          const customerName = (getRowVal(rowKeys, 'Customer') ?? '').trim();
           const customerId = customersByName.get(customerName.toLowerCase());
           if (!customerName || !customerId) {
             throw new HttpError(`Customer not found: ${customerName || '(empty)'}`, 400, 'VALIDATION_ERROR');
           }
 
-          const puCity = (row.PU_City ?? row.pu_city ?? '').trim();
-          const puState = (row.PU_State ?? row.pu_state ?? '').trim().toUpperCase();
-          const delCity = (row.DEL_City ?? row.del_city ?? '').trim();
-          const delState = (row.DEL_State ?? row.del_state ?? '').trim().toUpperCase();
+          const puCity = (getRowVal(rowKeys, 'PU_City', 'pu_city') ?? '').trim();
+          const puState = (getRowVal(rowKeys, 'PU_State', 'pu_state') ?? '').trim().toUpperCase();
+          const delCity = (getRowVal(rowKeys, 'DEL_City', 'del_city') ?? '').trim();
+          const delState = (getRowVal(rowKeys, 'DEL_State', 'del_state') ?? '').trim().toUpperCase();
 
           if (!puCity || puState.length !== 2) {
             throw new HttpError('PU_City and PU_State (2 letters) are required.', 400, 'VALIDATION_ERROR');
@@ -311,40 +349,61 @@ export function loadsRouter(repository: FreightRepository): Router {
             throw new HttpError('DEL_City and DEL_State (2 letters) are required.', 400, 'VALIDATION_ERROR');
           }
 
-          const rate = Number(row.Rate ?? row.rate ?? '');
-          const miles = Number(row.Miles ?? row.miles ?? '');
-          if (!Number.isFinite(rate) || rate <= 0) {
-            throw new HttpError('Rate must be a positive number.', 400, 'VALIDATION_ERROR');
+          const rateRaw = getRowVal(rowKeys, 'Rate', 'rate') ?? '';
+          const milesRaw = getRowVal(rowKeys, 'Miles', 'miles') ?? '';
+          const rate = parseImportNumber(rateRaw);
+          const miles = parseImportNumber(milesRaw);
+          const rawStatus = getRowVal(rowKeys, 'Load_Status', 'load_status', 'Status', 'status') ?? '';
+          const status = normalizeLoadStatusInput(rawStatus);
+          if (rawStatus.trim() && !status) {
+            throw new HttpError(
+              `Invalid Load_Status: "${rawStatus}". Accepted values: ${LOAD_STATUSES.join(', ')}, PENDING.`,
+              400,
+              'VALIDATION_ERROR',
+            );
           }
-          if (!Number.isFinite(miles) || miles <= 0) {
-            throw new HttpError('Miles must be a positive number.', 400, 'VALIDATION_ERROR');
-          }
+          const normalizedStatus = status ?? 'AVAILABLE';
 
-          const puAppt = parseBoolean(row.PU_APPT ?? row.pu_appt);
-          const delAppt = parseBoolean(row.DEL_APPT ?? row.del_appt);
-          const puApptTime = (row.PU_APPT_Time ?? row.pu_appt_time ?? '').trim();
-          const delApptTime = (row.DEL_APPT_Time ?? row.del_appt_time ?? '').trim();
+          if (!Number.isFinite(rate) || rate <= 0) {
+            throw new HttpError(`Rate must be a positive number. Received: "${rateRaw}"`, 400, 'VALIDATION_ERROR');
+          }
+          validateMilesForStatus(miles, normalizedStatus);
+
+          const puAppt = parseBoolean(getRowVal(rowKeys, 'PU_APPT', 'pu_appt'));
+          const delAppt = parseBoolean(getRowVal(rowKeys, 'DEL_APPT', 'del_appt'));
+          const puApptTime = (getRowVal(rowKeys, 'PU_APPT_Time', 'pu_appt_time') ?? '').trim();
+          const delApptTime = (getRowVal(rowKeys, 'DEL_APPT_Time', 'del_appt_time') ?? '').trim();
+
+          const amName = (getRowVal(rowKeys, 'Account_Manager', 'account_manager') ?? '').trim().toLowerCase();
+          const dispatcherName = (getRowVal(rowKeys, 'Dispatcher', 'dispatcher') ?? '').trim().toLowerCase();
+
+          const accountManagerId = amName ? usersByName.get(amName) ?? req.user!.sub : req.user!.sub;
+          const assignedDispatcherId = dispatcherName ? usersByName.get(dispatcherName) ?? undefined : undefined;
 
           await repository.createLoad({
             customerId,
-            accountManagerId: req.user!.sub,
-            loadRefNumber: (row.Load_Ref_Number ?? row.load_ref_number ?? '').trim() || undefined,
-            mcleodOrderId: (row.McLeod_ID ?? row.mcleod_id ?? '').trim() || undefined,
+            accountManagerId,
+            loadRefNumber: (getRowVal(rowKeys, 'Load_Ref_Number', 'load_ref_number') ?? '').trim() || undefined,
+            mcleodOrderId: (getRowVal(rowKeys, 'McLeod_ID', 'mcleod_id') ?? '').trim() || undefined,
             puCity,
             puState,
-            puZip: (row.PU_ZIP ?? row.pu_zip ?? '').trim() || undefined,
-            puDate: (row.PU_Date ?? row.pu_date ?? '').trim() || undefined,
+            puZip: (getRowVal(rowKeys, 'PU_ZIP', 'pu_zip') ?? '').trim() || undefined,
+            puDate: (getRowVal(rowKeys, 'PU_Date', 'pu_date') ?? '').trim() || undefined,
             puAppt,
             puApptTime: puAppt ? puApptTime || undefined : undefined,
             delCity,
             delState,
-            delZip: (row.DEL_ZIP ?? row.del_zip ?? '').trim() || undefined,
-            delDate: (row.DEL_Date ?? row.del_date ?? '').trim() || undefined,
+            delZip: (getRowVal(rowKeys, 'DEL_ZIP', 'del_zip') ?? '').trim() || undefined,
+            delDate: (getRowVal(rowKeys, 'DEL_Date', 'del_date') ?? '').trim() || undefined,
             delAppt,
             delApptTime: delAppt ? delApptTime || undefined : undefined,
             rate,
             miles,
-            notes: (row.Notes ?? row.notes ?? '').trim() || undefined,
+            notes: (getRowVal(rowKeys, 'Notes', 'notes') ?? '').trim() || undefined,
+            status: normalizedStatus,
+            assignedDispatcherId,
+            driverName: (getRowVal(rowKeys, 'Driver', 'driver', 'driver_name') ?? '').trim() || undefined,
+            truckNumber: (getRowVal(rowKeys, 'Truck', 'truck', 'truck_number') ?? '').trim() || undefined,
             actorName: req.user!.name,
           });
           importedCount += 1;
@@ -365,6 +424,19 @@ export function loadsRouter(repository: FreightRepository): Router {
           errors,
         },
       });
+    }),
+  );
+
+  router.delete(
+    '/loads/dev/all',
+    requireRoles(['MANAGER', 'ADMIN']),
+    asyncHandler(async (_req, res) => {
+      if ((process.env.NODE_ENV ?? 'development') === 'production') {
+        throw new HttpError('Delete-all loads endpoint is disabled in production.', 403, 'PERMISSION_DENIED');
+      }
+
+      const deletedCount = await repository.deleteAllLoads();
+      res.json({ success: true, data: { deletedCount } });
     }),
   );
 
@@ -434,7 +506,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.post(
     '/loads/:id/decide',
-    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER', 'DISPATCHER']),
     asyncHandler(async (req, res) => {
       const parsed = decideSchema.omit({ loadId: true }).parse(req.body);
       const existing = await repository.getLoadById(req.params.id);
@@ -465,7 +537,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.post(
     '/loads/:id/decision',
-    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER', 'DISPATCHER']),
     asyncHandler(async (req, res) => {
       const parsed = decideSchema.omit({ loadId: true }).parse(req.body);
       const existing = await repository.getLoadById(req.params.id);
@@ -496,7 +568,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.post(
     '/decide',
-    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER', 'DISPATCHER']),
     asyncHandler(async (req, res) => {
       const parsed = decideSchema.parse(req.body);
       if (!parsed.loadId) {
@@ -594,6 +666,12 @@ export function loadsRouter(repository: FreightRepository): Router {
         parsed.accountManagerId !== req.user!.sub
       ) {
         throw new HttpError('Cannot reassign load to another account manager.', 403, 'PERMISSION_DENIED');
+      }
+
+      if (parsed.miles !== undefined || parsed.status !== undefined) {
+        const nextStatus = parsed.status ?? existing.status;
+        const nextMiles = parsed.miles ?? Number(existing.miles);
+        validateMilesForStatus(nextMiles, nextStatus);
       }
 
       const load = await repository.updateLoad(req.params.id, {

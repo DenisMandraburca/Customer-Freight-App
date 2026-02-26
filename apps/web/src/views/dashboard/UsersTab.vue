@@ -1,22 +1,22 @@
 <template>
   <section class="space-y-4">
     <header class="flex items-center justify-between">
-      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-500">Settings</h3>
-      <p class="text-xs text-zinc-500">{{ filteredUsers.length }} users</p>
+      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-700">Settings</h3>
+      <p class="text-xs text-zinc-700">{{ filteredUsers.length }} users</p>
     </header>
 
     <div class="mb-4 flex flex-col gap-4 lg:flex-row">
       <div class="w-full glass-panel rounded-xl p-4 space-y-3 lg:w-[30%]">
-        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Search</h3>
+        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Search</h3>
         <input
           v-model="search"
           type="text"
           placeholder="Search by name or email..."
-          class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+          class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs"
         />
         <select
           v-model="roleFilter"
-          class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+          class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs"
         >
           <option value="">All Roles</option>
           <option value="ADMIN">ADMIN</option>
@@ -28,33 +28,33 @@
       </div>
 
       <div v-if="canManage" class="flex-1 glass-panel rounded-xl p-4">
-        <h3 class="mb-3 text-xs font-black uppercase tracking-widest text-zinc-500">
+        <h3 class="mb-3 text-xs font-black uppercase tracking-widest text-zinc-700">
           {{ editingUser ? 'Edit User' : 'Add User' }}
         </h3>
         <form class="grid grid-cols-1 gap-3 sm:grid-cols-3" @submit.prevent="submitUser">
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 sm:col-span-2">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 sm:col-span-2">
             Email
             <input
               v-model="form.email"
               required
               type="email"
               :readonly="Boolean(editingUser)"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
             />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Name
             <input
               v-model="form.name"
               required
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
             />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Role
             <select
               v-model="form.role"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs"
             >
               <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
             </select>
@@ -74,7 +74,7 @@
               </button>
             </div>
           </div>
-          <label v-if="form.role === 'ACCOUNT_MANAGER'" class="flex items-center gap-2 pt-1 text-xs font-semibold text-zinc-600 dark:text-zinc-300 sm:col-span-3">
+          <label v-if="form.role === 'ACCOUNT_MANAGER'" class="flex items-center gap-2 pt-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300 sm:col-span-3">
             <input v-model="form.fullLoadAccess" type="checkbox" />
             Full Load & Customer Access
           </label>
@@ -85,7 +85,7 @@
     <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
       <div class="overflow-x-auto">
         <table class="min-w-full text-left text-xs">
-          <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+          <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
             <tr>
               <th class="px-3 py-2">Email</th>
               <th class="px-3 py-2">Name</th>
@@ -147,7 +147,7 @@
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
-              <td colspan="5" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+              <td colspan="5" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
             </tr>
           </tbody>
         </table>
@@ -156,7 +156,7 @@
 
     <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
       <div class="glass-panel rounded-xl p-4 space-y-3">
-        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Users - Bulk Upload</h3>
+        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Users - Bulk Upload</h3>
         <button
           type="button"
           class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -165,12 +165,12 @@
           Download CSV Template
         </button>
         <label class="block">
-          <span class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Choose CSV File</span>
+          <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Choose CSV File</span>
           <input
             :key="inputKeys.users"
             type="file"
             accept=".csv"
-            class="mt-1 block w-full text-xs text-zinc-600 dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200"
+            class="mt-1 block w-full text-xs text-zinc-700 dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200"
             @change="onFileSelected('users', $event)"
           />
         </label>
@@ -178,10 +178,26 @@
           <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" @click="previewCsv('users')">Preview</button>
           <button type="button" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200" @click="cancelFile('users')">Cancel</button>
         </div>
+        <button
+          v-if="importErrorCount('users') > 0"
+          type="button"
+          class="text-left text-xs font-semibold text-amber-700 hover:text-amber-800 dark:text-amber-400"
+          @click="openImportErrors('users')"
+        >
+          Review last upload errors ({{ importErrorCount('users') }})
+        </button>
       </div>
 
       <div class="glass-panel rounded-xl p-4 space-y-3">
-        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Available Loads - Bulk Upload</h3>
+        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Loads - Bulk Upload</h3>
+        <button
+          v-if="isDevMode"
+          type="button"
+          class="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-900/20"
+          @click="clearAllLoadsDev"
+        >
+          DEV ONLY: Remove All Loads
+        </button>
         <button
           type="button"
           class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -190,12 +206,12 @@
           Download CSV Template
         </button>
         <label class="block">
-          <span class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Choose CSV File</span>
+          <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Choose CSV File</span>
           <input
             :key="inputKeys.loads"
             type="file"
             accept=".csv"
-            class="mt-1 block w-full text-xs text-zinc-600 dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200"
+            class="mt-1 block w-full text-xs text-zinc-700 dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200"
             @change="onFileSelected('loads', $event)"
           />
         </label>
@@ -203,10 +219,18 @@
           <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" @click="previewCsv('loads')">Preview</button>
           <button type="button" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200" @click="cancelFile('loads')">Cancel</button>
         </div>
+        <button
+          v-if="importErrorCount('loads') > 0"
+          type="button"
+          class="text-left text-xs font-semibold text-amber-700 hover:text-amber-800 dark:text-amber-400"
+          @click="openImportErrors('loads')"
+        >
+          Review last upload errors ({{ importErrorCount('loads') }})
+        </button>
       </div>
 
       <div class="glass-panel rounded-xl p-4 space-y-3">
-        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Customers - Bulk Upload</h3>
+        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Customers - Bulk Upload</h3>
         <button
           type="button"
           class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -215,12 +239,12 @@
           Download CSV Template
         </button>
         <label class="block">
-          <span class="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">Choose CSV File</span>
+          <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Choose CSV File</span>
           <input
             :key="inputKeys.customers"
             type="file"
             accept=".csv"
-            class="mt-1 block w-full text-xs text-zinc-600 dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200"
+            class="mt-1 block w-full text-xs text-zinc-700 dark:text-zinc-400 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-zinc-700 hover:file:bg-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200"
             @change="onFileSelected('customers', $event)"
           />
         </label>
@@ -228,6 +252,14 @@
           <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700" @click="previewCsv('customers')">Preview</button>
           <button type="button" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200" @click="cancelFile('customers')">Cancel</button>
         </div>
+        <button
+          v-if="importErrorCount('customers') > 0"
+          type="button"
+          class="text-left text-xs font-semibold text-amber-700 hover:text-amber-800 dark:text-amber-400"
+          @click="openImportErrors('customers')"
+        >
+          Review last upload errors ({{ importErrorCount('customers') }})
+        </button>
       </div>
     </div>
 
@@ -235,7 +267,7 @@
       <div class="w-full max-w-5xl rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
         <div class="flex items-center justify-between">
           <h4 class="text-sm font-bold">Preview: {{ categoryLabel(previewCategory) }} Upload ({{ previewTotalRows }} rows)</h4>
-          <button type="button" class="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" @click="showPreviewModal = false">X</button>
+          <button type="button" class="text-sm text-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100" @click="showPreviewModal = false">X</button>
         </div>
 
         <div class="mt-3 max-h-[55vh] overflow-auto rounded border border-zinc-200 dark:border-zinc-800">
@@ -248,7 +280,7 @@
           </table>
         </div>
 
-        <p class="mt-2 text-xs text-zinc-500">Showing first 10 rows of {{ previewTotalRows }} total rows</p>
+        <p class="mt-2 text-xs text-zinc-700">Showing first 10 rows of {{ previewTotalRows }} total rows</p>
 
         <div class="mt-4 flex justify-end gap-2">
           <button
@@ -268,6 +300,48 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showErrorsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div class="w-full max-w-3xl rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-bold">
+            Import Errors: {{ categoryLabel(errorsCategory) }} ({{ currentImportErrors.length }})
+          </h4>
+          <button type="button" class="text-sm text-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100" @click="showErrorsModal = false">X</button>
+        </div>
+
+        <div class="mt-3 max-h-[55vh] overflow-auto rounded border border-zinc-200 dark:border-zinc-800">
+          <table class="min-w-full text-left text-xs">
+            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
+              <tr>
+                <th class="px-3 py-2">Row</th>
+                <th class="px-3 py-2">Error</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <tr v-for="error in currentImportErrors" :key="`${errorsCategory}-${error.row}-${error.message}`">
+                <td class="px-3 py-2 font-semibold">{{ error.row }}</td>
+                <td class="px-3 py-2">{{ error.message }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mt-2 text-xs text-zinc-700">
+          Fix these rows in your CSV, then upload again.
+        </p>
+
+        <div class="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200"
+            @click="showErrorsModal = false"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -281,6 +355,7 @@ import {
   bulkImportCustomers,
   bulkImportLoads,
   bulkImportUsers,
+  deleteAllLoadsDev,
   type BulkImportResult,
 } from '@/api/freight';
 import { useUiStore } from '@/stores/ui';
@@ -306,6 +381,7 @@ const search = ref('');
 const roleFilter = ref('');
 const editingUser = ref<UserRecord | null>(null);
 const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? '').trim().toLowerCase();
+const isDevMode = import.meta.env.DEV;
 
 const form = reactive({
   name: '',
@@ -327,6 +403,9 @@ const parsedPreview = ref<Partial<Record<BulkCategory, string[][]>>>({});
 const showPreviewModal = ref(false);
 const previewCategory = ref<BulkCategory>('users');
 const previewTotalRows = ref(0);
+const importErrors = ref<Partial<Record<BulkCategory, BulkImportResult['errors']>>>({});
+const showErrorsModal = ref(false);
+const errorsCategory = ref<BulkCategory>('users');
 const inputKeys = reactive<Record<BulkCategory, number>>({
   users: 0,
   loads: 0,
@@ -349,6 +428,7 @@ const filteredUsers = computed(() => {
 const canSubmit = computed(() => form.name.trim().length > 0 && form.email.trim().length > 0);
 
 const currentPreviewRows = computed(() => parsedPreview.value[previewCategory.value] ?? []);
+const currentImportErrors = computed(() => importErrors.value[errorsCategory.value] ?? []);
 
 function isProtected(user: UserRecord): boolean {
   return Boolean(superAdminEmail) && user.email.trim().toLowerCase() === superAdminEmail;
@@ -416,6 +496,10 @@ function downloadTemplate(category: BulkCategory): void {
     users: ['Email', 'Name', 'Role', 'Full_Load_Access'],
     loads: [
       'Customer',
+      'Account_Manager',
+      'Dispatcher',
+      'Driver',
+      'Truck',
       'Load_Ref_Number',
       'McLeod_ID',
       'PU_City',
@@ -433,6 +517,7 @@ function downloadTemplate(category: BulkCategory): void {
       'Rate',
       'Miles',
       'Notes',
+      'Load_Status',
     ],
     customers: ['Name', 'Type', 'Quote_Accept'],
   };
@@ -468,7 +553,43 @@ async function previewCsv(category: BulkCategory): Promise<void> {
 
 function cancelFile(category: BulkCategory): void {
   selectedFiles[category] = null;
+  importErrors.value[category] = [];
   inputKeys[category] += 1;
+}
+
+function importErrorCount(category: BulkCategory): number {
+  return importErrors.value[category]?.length ?? 0;
+}
+
+function openImportErrors(category: BulkCategory): void {
+  if (importErrorCount(category) === 0) {
+    return;
+  }
+  errorsCategory.value = category;
+  showErrorsModal.value = true;
+}
+
+async function clearAllLoadsDev(): Promise<void> {
+  if (!isDevMode) {
+    return;
+  }
+
+  const confirmed = window.confirm('This will permanently remove all loads. Continue?');
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const result = await deleteAllLoadsDev();
+    await queryClient.invalidateQueries({ queryKey: ['initial-data'] });
+    importErrors.value.loads = [];
+    selectedFiles.loads = null;
+    inputKeys.loads += 1;
+    uiStore.showToast(`Deleted ${result.deletedCount} loads`, 'success');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove loads';
+    uiStore.showToast(message, 'error');
+  }
 }
 
 async function confirmImport(category: BulkCategory): Promise<void> {
@@ -493,9 +614,13 @@ async function confirmImport(category: BulkCategory): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: ['initial-data'] });
 
     if (result.failedCount === 0) {
+      importErrors.value[category] = [];
       uiStore.showToast(`Imported ${result.importedCount}/${result.totalRows} ${category}`, 'success');
       cancelFile(category);
     } else {
+      importErrors.value[category] = result.errors;
+      errorsCategory.value = category;
+      showErrorsModal.value = true;
       uiStore.showToast(
         `Partial import: ${result.importedCount} imported, ${result.failedCount} failed`,
         'warning',
@@ -510,11 +635,55 @@ async function confirmImport(category: BulkCategory): Promise<void> {
 }
 
 function parseCsv(raw: string): string[][] {
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => line.split(',').map((value) => value.trim()));
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index]!;
+    const next = raw[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      value += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (!inQuotes && char === ',') {
+      row.push(value.trim());
+      value = '';
+      continue;
+    }
+
+    if (!inQuotes && (char === '\n' || char === '\r')) {
+      if (char === '\r' && next === '\n') {
+        index += 1;
+      }
+
+      if (value.length > 0 || row.length > 0) {
+        row.push(value.trim());
+        rows.push(row);
+      }
+      row = [];
+      value = '';
+      continue;
+    }
+
+    value += char;
+  }
+
+  if (value.length > 0 || row.length > 0) {
+    row.push(value.trim());
+    rows.push(row);
+  }
+
+  return rows;
 }
 
 function toObjectRows(rows: string[][]): Array<Record<string, string>> {
@@ -534,8 +703,7 @@ function toObjectRows(rows: string[][]): Array<Record<string, string>> {
 
 function categoryLabel(category: BulkCategory): string {
   if (category === 'users') return 'Users';
-  if (category === 'loads') return 'Available Loads';
+  if (category === 'loads') return 'Loads';
   return 'Customers';
 }
 </script>
-

@@ -1,8 +1,8 @@
 <template>
   <section class="space-y-4">
     <header class="flex items-center justify-between">
-      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-500">Greenbush Bank</h3>
-      <p class="text-xs text-zinc-500">{{ filteredGreenbushRows.length }} rows</p>
+      <h3 class="text-sm font-black uppercase tracking-widest text-zinc-700">Greenbush Bank</h3>
+      <p class="text-xs text-zinc-700">{{ filteredGreenbushRows.length }} rows</p>
     </header>
 
     <div class="mb-4 flex flex-col gap-4 lg:flex-row">
@@ -10,53 +10,52 @@
         class="w-full glass-panel rounded-xl transition-all duration-200 lg:w-[30%]"
         :class="manualPanelExpanded || !canManage ? 'space-y-3 p-4' : 'space-y-2 p-3'"
       >
-        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">Search</h3>
+        <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">Search</h3>
         <input
           v-model="greenbushSearch"
           type="text"
           placeholder="Pickup location or destination..."
           class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
-          :class="manualPanelExpanded || !canManage ? '' : 'hidden'"
         />
-        <p v-if="!manualPanelExpanded && canManage" class="text-[10px] text-zinc-400">
+        <p v-if="!manualPanelExpanded && canManage" class="text-[10px] text-zinc-600">
           {{ greenbushSearch ? 'Search active' : 'Search ready' }}
         </p>
       </div>
 
       <div v-if="canManage" class="flex-1 glass-panel rounded-xl p-3 transition-all duration-200">
         <div class="flex items-center justify-between">
-          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-500">
+          <h3 class="text-xs font-black uppercase tracking-widest text-zinc-700">
             {{ editingId ? 'Edit Route' : 'Add Load Manually' }}
           </h3>
           <button
             type="button"
-            class="rounded border border-zinc-300 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            class="rounded border border-zinc-300 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             @click="manualPanelExpanded = !manualPanelExpanded"
           >
             {{ manualPanelExpanded ? 'Collapse' : 'Expand' }}
           </button>
         </div>
-        <p v-if="!manualPanelExpanded" class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+        <p v-if="!manualPanelExpanded" class="mt-2 text-[11px] text-zinc-700 dark:text-zinc-400">
           Expand to add or edit Greenbush routes.
         </p>
         <form v-show="manualPanelExpanded" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" @submit.prevent="submitRow">
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Pickup Location
             <input v-model="form.pickupLocation" required class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Destination
             <input v-model="form.destination" required class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Receiving Hours
             <input v-model="form.receivingHours" placeholder="e.g. 06:00 - 22:00" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Price ($)
             <input v-model.number="form.price" required type="number" min="0" step="0.01" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Tarp
             <select v-model="form.tarp" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900">
               <option value="No">No</option>
@@ -64,11 +63,11 @@
               <option value="Optional">Optional</option>
             </select>
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
             Amount / Count
             <input v-model.number="form.remainingCount" type="number" min="1" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
-          <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 sm:col-span-2">
+          <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 sm:col-span-2">
             Special Notes
             <textarea v-model="form.specialNotes" rows="2" class="mt-1 w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-900" />
           </label>
@@ -87,7 +86,7 @@
     <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-900/20">
       <div class="overflow-x-auto">
         <table class="min-w-full text-left text-xs">
-          <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+          <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
             <tr>
               <th class="px-3 py-2">Pickup Location</th>
               <th class="px-3 py-2">Destination</th>
@@ -121,7 +120,7 @@
               </td>
             </tr>
             <tr v-if="filteredGreenbushRows.length === 0">
-              <td colspan="10" class="py-8 text-center text-xs text-zinc-400">No records found.</td>
+              <td colspan="10" class="py-8 text-center text-xs text-zinc-600">No records found.</td>
             </tr>
           </tbody>
         </table>
@@ -129,8 +128,8 @@
     </div>
 
     <article v-if="canManage" class="rounded-xl border border-zinc-200 bg-white/50 p-4 dark:border-zinc-800 dark:bg-zinc-900/20">
-      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-500">Bulk Replace</h4>
-      <p class="mt-1 text-xs text-zinc-500">Paste tab-delimited rows and preview before replacing.</p>
+      <h4 class="text-xs font-black uppercase tracking-widest text-zinc-700">Bulk Replace</h4>
+      <p class="mt-1 text-xs text-zinc-700">Paste tab-delimited rows and preview before replacing.</p>
       <textarea v-model="bulkInput" rows="6" class="mt-2 w-full rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"></textarea>
       <div class="mt-2 flex gap-2">
         <button type="button" class="rounded bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900" @click="previewBulk">Preview</button>
@@ -140,7 +139,7 @@
       <div v-if="previewRows.length > 0" class="mt-3 overflow-hidden rounded border border-zinc-200 dark:border-zinc-800">
         <div class="overflow-x-auto">
           <table class="min-w-full text-left text-xs">
-            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-300">
+            <thead class="bg-zinc-100/70 text-[10px] uppercase tracking-widest text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
               <tr>
                 <th class="px-2 py-1">Pickup</th>
                 <th class="px-2 py-1">Destination</th>

@@ -1,4 +1,5 @@
 import type { ApiEnvelope, ApiErrorEnvelope } from '@/types/models';
+import { portalLoginUrl } from '@/config/runtime';
 
 type LegacyEnvelope<T> = { data: T };
 
@@ -65,7 +66,7 @@ export async function http<T>(input: RequestInfo | URL, init?: RequestInit): Pro
   });
 
   if (response.status === 401) {
-    window.location.href = '/apps/hub/login';
+    window.location.href = portalLoginUrl;
     throw new ApiRequestError('Unauthorized', 'UNAUTHORIZED', 401);
   }
 

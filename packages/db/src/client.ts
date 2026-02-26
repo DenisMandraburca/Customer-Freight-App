@@ -1,6 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import SqliteDriver, { type Database as SqliteDatabaseDriver } from 'better-sqlite3';
 import type { PoolConfig } from 'pg';
+
+import { type DbDialect, resolveDbProvider, resolveSqliteFilePath } from './dbConfig.js';
+import { normalizeSqliteQuery } from './sqlDialect.js';
 
 export interface QueryResultLike<T = Record<string, unknown>> {
   rows: T[];
@@ -165,19 +172,12 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-export class Database implements QueryExecutor {
+class PostgresDatabase implements QueryExecutor {
+  readonly dialect: DbDialect = 'postgres';
   private readonly prisma: PrismaClient;
 
-  private constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient) {
     this.prisma = prisma;
-  }
-
-  static async create(): Promise<Database> {
-    return new Database(createPrismaClient());
-  }
-
-  get remote(): boolean {
-    return true;
   }
 
   async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<QueryResultLike<T>> {
@@ -234,6 +234,137 @@ export class Database implements QueryExecutor {
 
   async close(): Promise<void> {
     await this.prisma.$disconnect();
+  }
+}
+
+type SqliteBindableValue = string | number | bigint | Buffer | null;
+
+function normalizeSqliteParam(param: unknown, index: number): SqliteBindableValue {
+  if (param === undefined || param === null) {
+    return null;
+  }
+
+  if (typeof param === 'boolean') {
+    return param ? 1 : 0;
+  }
+
+  if (param instanceof Date) {
+    return param.toISOString();
+  }
+
+  if (typeof param === 'string' || typeof param === 'number' || typeof param === 'bigint') {
+    return param;
+  }
+
+  if (Buffer.isBuffer(param)) {
+    return param;
+  }
+
+  throw new TypeError(`Unsupported SQLite parameter at index ${index}.`);
+}
+
+class SqliteDatabase implements QueryExecutor {
+  readonly dialect: DbDialect = 'sqlite';
+  private readonly db: SqliteDatabaseDriver;
+
+  constructor(filePath: string) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    this.db = new SqliteDriver(filePath);
+  }
+
+  async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<QueryResultLike<T>> {
+    const placeholderOrder = [...sql.matchAll(/\$(\d+)/g)].map((match) => Number(match[1]));
+    const normalizedSql = normalizeSqliteQuery(sql);
+    const statement = this.db.prepare(normalizedSql);
+    const normalized = normalizedSql.trim().toLowerCase();
+    const hasReturning = /\breturning\b/.test(normalized);
+    const expectsRows = hasReturning || normalized.startsWith('select') || normalized.startsWith('with');
+    const sourceParams =
+      placeholderOrder.length > 0
+        ? placeholderOrder.map((position) => params[position - 1])
+        : params;
+    const boundParams = sourceParams.map((param, index) => normalizeSqliteParam(param, index));
+
+    if (expectsRows) {
+      const rows = statement.all(...boundParams) as T[];
+      return {
+        rows: rows ?? [],
+        rowCount: rows?.length ?? 0,
+      };
+    }
+
+    const info = statement.run(...boundParams);
+    return {
+      rows: [],
+      rowCount: Number.isFinite(info.changes) ? info.changes : 0,
+    };
+  }
+
+  async execScript(sql: string): Promise<void> {
+    const normalizedSql = normalizeSqliteQuery(sql);
+    this.db.exec(normalizedSql);
+  }
+
+  async withTransaction<T>(handler: (tx: QueryExecutor) => Promise<T>): Promise<T> {
+    await this.execScript('BEGIN');
+    const tx: QueryExecutor = {
+      query: async <R = Record<string, unknown>>(sql: string, params: unknown[] = []) => this.query<R>(sql, params),
+    };
+
+    try {
+      const result = await handler(tx);
+      await this.execScript('COMMIT');
+      return result;
+    } catch (error) {
+      await this.execScript('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async close(): Promise<void> {
+    this.db.close();
+  }
+}
+
+type DatabaseBackend = PostgresDatabase | SqliteDatabase;
+
+export class Database implements QueryExecutor {
+  readonly dialect: DbDialect;
+  private readonly backend: DatabaseBackend;
+
+  private constructor(backend: DatabaseBackend) {
+    this.backend = backend;
+    this.dialect = backend.dialect;
+  }
+
+  static async create(): Promise<Database> {
+    const provider = resolveDbProvider();
+
+    if (provider === 'sqlite') {
+      return new Database(new SqliteDatabase(resolveSqliteFilePath()));
+    }
+
+    return new Database(new PostgresDatabase(createPrismaClient()));
+  }
+
+  get remote(): boolean {
+    return this.dialect === 'postgres';
+  }
+
+  async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<QueryResultLike<T>> {
+    return this.backend.query<T>(sql, params);
+  }
+
+  async execScript(sql: string): Promise<void> {
+    await this.backend.execScript(sql);
+  }
+
+  async withTransaction<T>(handler: (tx: QueryExecutor) => Promise<T>): Promise<T> {
+    return this.backend.withTransaction(handler);
+  }
+
+  async close(): Promise<void> {
+    await this.backend.close();
   }
 }
 

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
+import { portalLoginUrl } from '@/config/runtime';
 import { pinia } from '@/pinia';
 import { useAuthStore } from '@/stores/auth';
 
@@ -38,7 +39,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    window.location.href = '/apps/hub/login';
+    window.location.href = portalLoginUrl;
     return false;
   }
 

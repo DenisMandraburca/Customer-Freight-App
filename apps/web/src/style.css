@@ -6,40 +6,60 @@
 
 :root {
   color-scheme: light;
-  --app-bg: radial-gradient(circle at 12% 12%, rgba(191, 0, 0, 0.08), transparent 44%),
-    radial-gradient(circle at 88% 16%, rgba(0, 0, 0, 0.04), transparent 40%),
-    linear-gradient(140deg, #f8f8f8 0%, #ffffff 48%, #f4f4f4 100%);
-  --card-bg: rgba(255, 255, 255, 0.85);
-  --card-border: rgba(17, 17, 17, 0.08);
-  --text-main: #18181b;
-  --text-soft: #52525b;
+  --app-bg: radial-gradient(circle at 12% 12%, rgba(191, 0, 0, 0.03), transparent 44%),
+    radial-gradient(circle at 88% 16%, rgba(203, 213, 225, 0.1), transparent 40%),
+    linear-gradient(140deg, #f8fafc 0%, #ffffff 48%, #f1f5f9 100%);
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --card-border: #e2e8f0;
+  --text-main: #0f172a;
+  --text-soft: #334155;
   --brand-primary: #bf0000;
   --brand-primary-strong: #960000;
-  --brand-ink: #121212;
+  --brand-ink: #020617;
   --brand-surface: #ffffff;
 }
 
 .dark {
   color-scheme: dark;
-  --app-bg: radial-gradient(circle at 10% 8%, rgba(191, 0, 0, 0.2), transparent 42%),
-    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.04), transparent 32%),
-    linear-gradient(160deg, #09090b 0%, #121212 48%, #040405 100%);
-  --card-bg: rgba(24, 24, 27, 0.75);
-  --card-border: rgba(255, 255, 255, 0.1);
-  --text-main: #fafafa;
-  --text-soft: #a1a1aa;
+  --app-bg: radial-gradient(circle at 10% 8%, rgba(191, 0, 0, 0.15), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.02), transparent 32%),
+    linear-gradient(160deg, #020617 0%, #0f172a 48%, #020617 100%);
+  --card-bg: rgba(15, 23, 42, 0.75);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --text-main: #f8fafc;
+  --text-soft: #94a3b8;
   --brand-primary: #d70f0f;
   --brand-primary-strong: #ff4d4d;
-  --brand-ink: #fafafa;
-  --brand-surface: #09090b;
+  --brand-ink: #f8fafc;
+  --brand-surface: #020617;
 }
 
 body {
   min-height: 100vh;
   background: var(--app-bg);
   color: var(--text-main);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   letter-spacing: -0.01em;
+}
+
+/* Global Form Enhancements to fix "muddy" light mode inputs */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  @apply bg-white border-zinc-200 text-zinc-900 transition-all duration-200;
+  @apply focus:ring-2 focus:ring-brand-red/20 focus:border-brand-red outline-none;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  @apply bg-zinc-950 border-zinc-800 text-zinc-100;
+  @apply focus:ring-brand-red/40 focus:border-brand-red;
+}
+
+input::placeholder,
+textarea::placeholder {
+  @apply text-zinc-600 font-normal;
 }
 
 .glass-panel {
