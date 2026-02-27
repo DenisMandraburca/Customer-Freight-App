@@ -516,6 +516,13 @@ export async function getSettlementDetail(settlementId: string): Promise<Settlem
   return unwrap<SettlementDetail>(`/api/customer-freight/settlements/${settlementId}`);
 }
 
-export function getSettlementPdfUrl(settlementId: string): string {
-  return `/api/customer-freight/settlements/${settlementId}/pdf`;
+export async function deleteSettlement(settlementId: string): Promise<void> {
+  return unwrap(`/api/customer-freight/settlements/${settlementId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function getSettlementPdfUrl(settlementId: string, mode: 'summary' | 'detailed' = 'summary'): string {
+  const query = new URLSearchParams({ mode }).toString();
+  return `/api/customer-freight/settlements/${settlementId}/pdf?${query}`;
 }

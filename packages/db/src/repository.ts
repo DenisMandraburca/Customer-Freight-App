@@ -550,6 +550,37 @@ function parseMonthYearFromDateText(value: string | null | undefined): { month: 
   return null;
 }
 
+function isSettlementActiveUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  if (message.includes('idx_settlements_active_unique')) {
+    return true;
+  }
+  if (
+    message.includes('unique constraint failed: settlements.user_id') &&
+    message.includes('settlements.month') &&
+    message.includes('settlements.year') &&
+    message.includes('settlements.calculation_method')
+  ) {
+    return true;
+  }
+
+  const maybeCode = (error as { code?: unknown }).code;
+  if (maybeCode === 'SQLITE_CONSTRAINT_UNIQUE' || maybeCode === '23505') {
+    return message.includes('settlement');
+  }
+
+  const maybeMeta = (error as { meta?: { code?: unknown; message?: unknown } }).meta;
+  if (maybeMeta?.code === '23505' && typeof maybeMeta.message === 'string') {
+    return maybeMeta.message.toLowerCase().includes('settlement');
+  }
+
+  return false;
+}
+
 function buildChatOrderMeta(load: Pick<LoadRecord, 'id' | 'load_ref_number' | 'mcleod_order_id'>): {
   type: ChatOrderKeyType;
   value: string;
@@ -1126,6 +1157,23 @@ export class FreightRepository {
   async createSettlementWithEntries(input: SettlementInsertInput): Promise<SettlementDetailRecord> {
     return this.db.withTransaction(async (tx) => {
       const settlementId = randomUUID();
+
+      if (input.overrideSettlementId) {
+        const updateResult = await tx.query(
+          `update settlements
+           set status = 'OVERRIDDEN',
+               overridden_at = $2,
+               overridden_by_user_id = $3,
+               superseded_by_settlement_id = null
+           where id = $1
+             and status = 'ACTIVE'`,
+          [input.overrideSettlementId, new Date().toISOString(), input.generatedByUserId],
+        );
+        if (updateResult.rowCount === 0) {
+          throw new HttpError('Active settlement for override was not found.', 409, 'SETTLEMENT_EXISTS');
+        }
+      }
+
       const insertSql = sqlByDialect(this.dialect, {
         postgres: `insert into settlements (
             id,
@@ -1180,25 +1228,32 @@ export class FreightRepository {
           )`,
       });
 
-      await tx.query<SettlementRecord>(insertSql, [
-        settlementId,
-        input.userId,
-        input.month,
-        input.year,
-        input.calculationMethod,
-        input.defaultFlatPay,
-        input.brokerLoadCount,
-        input.directExceptionLoadCount,
-        input.directStandardLoadCount,
-        input.tierApplied,
-        input.tierRate,
-        input.totalLoadCompensation,
-        input.totalSettlementAmount,
-        JSON.stringify(input.excludedLoadsJson ?? []),
-        JSON.stringify(input.crossMonthLoadsJson ?? []),
-        input.generatedByUserId,
-        input.tierVersion,
-      ]);
+      try {
+        await tx.query<SettlementRecord>(insertSql, [
+          settlementId,
+          input.userId,
+          input.month,
+          input.year,
+          input.calculationMethod,
+          input.defaultFlatPay,
+          input.brokerLoadCount,
+          input.directExceptionLoadCount,
+          input.directStandardLoadCount,
+          input.tierApplied,
+          input.tierRate,
+          input.totalLoadCompensation,
+          input.totalSettlementAmount,
+          JSON.stringify(input.excludedLoadsJson ?? []),
+          JSON.stringify(input.crossMonthLoadsJson ?? []),
+          input.generatedByUserId,
+          input.tierVersion,
+        ]);
+      } catch (error) {
+        if (isSettlementActiveUniqueViolation(error)) {
+          throw new HttpError('Settlement already exists for this month/year/method.', 409, 'SETTLEMENT_EXISTS');
+        }
+        throw error;
+      }
 
       for (const entry of input.entries) {
         await tx.query(
@@ -1246,19 +1301,12 @@ export class FreightRepository {
       }
 
       if (input.overrideSettlementId) {
-        const updateResult = await tx.query(
+        await tx.query(
           `update settlements
-           set status = 'OVERRIDDEN',
-               overridden_at = $3,
-               overridden_by_user_id = $4,
-               superseded_by_settlement_id = $2
-           where id = $1
-             and status = 'ACTIVE'`,
-          [input.overrideSettlementId, settlementId, new Date().toISOString(), input.generatedByUserId],
+           set superseded_by_settlement_id = $2
+           where id = $1`,
+          [input.overrideSettlementId, settlementId],
         );
-        if (updateResult.rowCount === 0) {
-          throw new HttpError('Active settlement for override was not found.', 409, 'SETTLEMENT_EXISTS');
-        }
       }
 
       const detail = await this.getSettlementDetailByIdWithExecutor(tx, settlementId);
@@ -1271,6 +1319,13 @@ export class FreightRepository {
 
   async getSettlementDetailById(settlementId: string): Promise<SettlementDetailRecord | null> {
     return this.getSettlementDetailByIdWithExecutor(this.db, settlementId);
+  }
+
+  async deleteSettlement(settlementId: string): Promise<void> {
+    const result = await this.db.query(`delete from settlements where id = $1`, [settlementId]);
+    if (result.rowCount === 0) {
+      throw new HttpError('Settlement not found.', 404, 'NOT_FOUND');
+    }
   }
 
   async listSettlementSummaries(limit: number): Promise<SettlementSummaryRecord[]> {
