@@ -1,6 +1,16 @@
 import type { LoadStatus } from '@antigravity/shared';
 
-import type { ApiEnvelope, CustomerRecord, GreenbushRecord, LoadRecord, SessionUser, UserRecord } from '@/types/models';
+import type {
+  ApiEnvelope,
+  ChatTargetScope,
+  CustomerRecord,
+  GreenbushRecord,
+  LoadChatLoadSummaryRecord,
+  LoadChatMessageRecord,
+  LoadRecord,
+  SessionUser,
+  UserRecord,
+} from '@/types/models';
 
 import { unwrap, unwrapEnvelope } from './http';
 
@@ -119,6 +129,15 @@ export interface BulkImportResult {
   importedCount: number;
   failedCount: number;
   errors: BulkImportError[];
+}
+
+export interface CreateLoadChatMessagePayload {
+  messageText: string;
+  targetScope: ChatTargetScope;
+}
+
+export interface UpdateLoadChatProtectionPayload {
+  protectFromPurge: boolean;
 }
 
 export interface LoadFilters {
@@ -335,6 +354,68 @@ export async function bulkReplaceGreenbush(rows: GreenbushMutationPayload[]): Pr
 export async function incrementGreenbush(greenbushId: string): Promise<GreenbushRecord> {
   return unwrap<GreenbushRecord>(`/api/customer-freight/greenbush/${greenbushId}/increment`, {
     method: 'POST',
+  });
+}
+
+export async function getChatLoads(includeDelivered = false): Promise<LoadChatLoadSummaryRecord[]> {
+  const params = new URLSearchParams();
+  if (includeDelivered) {
+    params.set('includeDelivered', '1');
+  }
+
+  const query = params.toString();
+  return unwrap<LoadChatLoadSummaryRecord[]>(`/api/customer-freight/chat/loads${query ? `?${query}` : ''}`);
+}
+
+export async function getLoadChatMessages(loadId: string, includeDelivered = false): Promise<LoadChatMessageRecord[]> {
+  const params = new URLSearchParams();
+  if (includeDelivered) {
+    params.set('includeDelivered', '1');
+  }
+
+  const query = params.toString();
+  return unwrap<LoadChatMessageRecord[]>(
+    `/api/customer-freight/chat/loads/${loadId}/messages${query ? `?${query}` : ''}`,
+  );
+}
+
+export async function createLoadChatMessage(
+  loadId: string,
+  payload: CreateLoadChatMessagePayload,
+  includeDelivered = false,
+): Promise<LoadChatMessageRecord> {
+  const params = new URLSearchParams();
+  if (includeDelivered) {
+    params.set('includeDelivered', '1');
+  }
+
+  const query = params.toString();
+  return unwrap<LoadChatMessageRecord>(`/api/customer-freight/chat/loads/${loadId}/messages${query ? `?${query}` : ''}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateLoadChatProtection(
+  loadId: string,
+  payload: UpdateLoadChatProtectionPayload,
+): Promise<{ loadId: string; protectFromPurge: boolean }> {
+  return unwrap<{ loadId: string; protectFromPurge: boolean }>(`/api/customer-freight/chat/loads/${loadId}/protection`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteLoadChatMessage(messageId: string): Promise<void> {
+  return unwrap<void>(`/api/customer-freight/chat/messages/${messageId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function clearLoadChatOrder(orderKey: string): Promise<{ deletedCount: number }> {
+  return unwrap<{ deletedCount: number }>('/api/customer-freight/chat/orders/clear', {
+    method: 'POST',
+    body: JSON.stringify({ orderKey }),
   });
 }
 

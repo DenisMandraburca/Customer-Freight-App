@@ -12,6 +12,7 @@ import { requirePortalSession, resolveAppUserContext } from './middleware/auth.j
 import { checkCompanyDomain } from './middleware/checkCompanyDomain.js';
 import { errorHandler } from './middleware/errors.js';
 import { adminRouter } from './routes/admin.js';
+import { chatRouter } from './routes/chat.js';
 import { greenbushRouter } from './routes/greenbush.js';
 import { loadsRouter } from './routes/loads.js';
 
@@ -125,6 +126,7 @@ export function createApp(repository: FreightRepository, options: CreateAppOptio
   });
 
   app.use(apiBasePath, loadsRouter(repository));
+  app.use(apiBasePath, chatRouter(repository));
   app.use(apiBasePath, greenbushRouter(repository));
   app.use(apiBasePath, adminRouter(repository));
 

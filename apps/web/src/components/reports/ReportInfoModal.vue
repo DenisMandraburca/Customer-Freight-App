@@ -1,7 +1,7 @@
 <template>
   <teleport to="body">
-    <div v-if="open && info" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
-      <div class="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
+    <div v-if="open && info" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" @click="emit('close')">
+      <div class="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900" @click.stop>
         <div class="flex items-center justify-between">
           <h4 class="text-sm font-bold">{{ info.title }}</h4>
           <button

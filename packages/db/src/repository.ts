@@ -97,6 +97,51 @@ export interface LoadRecord {
   dispatcher_name: string | null;
 }
 
+export const CHAT_MESSAGE_TYPES = ['MANUAL', 'SYSTEM'] as const;
+export type ChatMessageType = (typeof CHAT_MESSAGE_TYPES)[number];
+
+export const CHAT_TARGET_SCOPES = ['ORDER_PARTICIPANTS', 'ACCOUNT_MANAGER', 'DISPATCHER'] as const;
+export type ChatTargetScope = (typeof CHAT_TARGET_SCOPES)[number];
+
+type ChatOrderKeyType = 'MCLEOD' | 'REF' | 'LOAD';
+
+export interface LoadChatLoadSummaryRecord {
+  id: string;
+  created_at: string;
+  status: LoadStatus;
+  load_ref_number: string;
+  mcleod_order_id: string | null;
+  customer_name: string | null;
+  pu_city: string;
+  pu_state: string;
+  del_city: string;
+  del_state: string;
+  account_manager_id: string | null;
+  account_manager_name: string | null;
+  assigned_dispatcher_id: string | null;
+  dispatcher_name: string | null;
+  driver_name: string | null;
+  truck_number: string | null;
+  order_key: string;
+  order_label: string;
+  unread_count: number;
+  is_protected: boolean;
+}
+
+export interface LoadChatMessageRecord {
+  id: string;
+  load_id: string;
+  sender_user_id: string | null;
+  sender_name: string;
+  message_text: string;
+  message_type: ChatMessageType;
+  target_scope: ChatTargetScope;
+  target_user_id: string | null;
+  target_user_name: string | null;
+  system_event: string | null;
+  created_at: string;
+}
+
 export interface LoadFilters {
   status?: LoadStatus;
   customer?: string;
@@ -224,6 +269,25 @@ export interface UpdateLoadInput {
   actorName?: string;
 }
 
+export interface CreateLoadChatMessageInput {
+  loadId: string;
+  senderUserId?: string | null;
+  senderName: string;
+  messageText: string;
+  messageType?: ChatMessageType;
+  targetScope: ChatTargetScope;
+  targetUserId?: string | null;
+  systemEvent?: string | null;
+}
+
+function normalizeRole(role: UserRole): UserRole {
+  return role === 'MANAGER' ? 'ADMIN' : role;
+}
+
+function isAdminLike(role: UserRole): boolean {
+  return normalizeRole(role) === 'ADMIN';
+}
+
 function asNumber(value: number, field: string): number {
   if (!Number.isFinite(value)) {
     throw new HttpError(`${field} must be a valid number.`, 400, 'VALIDATION_ERROR');
@@ -280,6 +344,96 @@ function replaceLastQuoteLine(reasonLog: string | null, replacement: string): st
   }
 
   return reasonLog;
+}
+
+function normalizeTimestamp(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  return `${value ?? ''}`;
+}
+
+function toBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 't' || normalized === 'yes' || normalized === 'y';
+  }
+  return false;
+}
+
+function buildChatOrderMeta(load: Pick<LoadRecord, 'id' | 'load_ref_number' | 'mcleod_order_id'>): {
+  type: ChatOrderKeyType;
+  value: string;
+  key: string;
+  label: string;
+} {
+  const mcleodOrderId = load.mcleod_order_id?.trim();
+  if (mcleodOrderId) {
+    return {
+      type: 'MCLEOD',
+      value: mcleodOrderId.toLowerCase(),
+      key: `MCLEOD:${mcleodOrderId.toLowerCase()}`,
+      label: mcleodOrderId,
+    };
+  }
+
+  const loadRefNumber = load.load_ref_number.trim();
+  if (loadRefNumber) {
+    return {
+      type: 'REF',
+      value: loadRefNumber.toLowerCase(),
+      key: `REF:${loadRefNumber.toLowerCase()}`,
+      label: loadRefNumber,
+    };
+  }
+
+  return {
+    type: 'LOAD',
+    value: load.id,
+    key: `LOAD:${load.id}`,
+    label: load.id,
+  };
+}
+
+function parseChatOrderKey(orderKey: string): { type: ChatOrderKeyType; value: string } {
+  const trimmed = orderKey.trim();
+  const separator = trimmed.indexOf(':');
+
+  if (separator <= 0 || separator === trimmed.length - 1) {
+    throw new HttpError('orderKey must use the format TYPE:value.', 400, 'VALIDATION_ERROR');
+  }
+
+  const rawType = trimmed.slice(0, separator).toUpperCase();
+  const rawValue = trimmed.slice(separator + 1).trim();
+
+  if (!rawValue) {
+    throw new HttpError('orderKey value is required.', 400, 'VALIDATION_ERROR');
+  }
+
+  if (rawType === 'MCLEOD' || rawType === 'REF') {
+    return { type: rawType, value: rawValue.toLowerCase() };
+  }
+
+  if (rawType === 'LOAD') {
+    return { type: 'LOAD', value: rawValue };
+  }
+
+  throw new HttpError('orderKey type must be MCLEOD, REF, or LOAD.', 400, 'VALIDATION_ERROR');
+}
+
+function toUtcIsoAfterDays(days: number): string {
+  const now = new Date();
+  now.setUTCDate(now.getUTCDate() + days);
+  return now.toISOString();
 }
 
 async function ensureGreenbushCustomer(tx: QueryExecutor, dialect: DbDialect): Promise<string> {
@@ -981,6 +1135,444 @@ export class FreightRepository {
     return result.rows;
   }
 
+  async listChatLoads(): Promise<LoadChatLoadSummaryRecord[]> {
+    const result = await this.db.query<LoadRecord>(
+      `${this.loadSelectSql}
+       order by l.created_at desc`,
+    );
+
+    const loadIds = result.rows.map((load) => load.id);
+    const protectedByLoad = new Map<string, boolean>();
+
+    if (loadIds.length > 0) {
+      const params: unknown[] = [];
+      const placeholders = loadIds.map((loadId) => {
+        params.push(loadId);
+        return `$${params.length}`;
+      });
+
+      const protectionRows = await this.db.query<{ load_id: string; protect_from_purge: unknown }>(
+        `select load_id, protect_from_purge
+         from load_chat_settings
+         where load_id in (${placeholders.join(', ')})`,
+        params,
+      );
+
+      for (const row of protectionRows.rows) {
+        protectedByLoad.set(row.load_id, toBoolean(row.protect_from_purge));
+      }
+    }
+
+    return result.rows.map((load) => {
+      const orderMeta = buildChatOrderMeta(load);
+      return {
+        id: load.id,
+        created_at: normalizeTimestamp(load.created_at),
+        status: load.status,
+        load_ref_number: load.load_ref_number,
+        mcleod_order_id: load.mcleod_order_id,
+        customer_name: load.customer_name,
+        pu_city: load.pu_city,
+        pu_state: load.pu_state,
+        del_city: load.del_city,
+        del_state: load.del_state,
+        account_manager_id: load.account_manager_id,
+        account_manager_name: load.account_manager_name,
+        assigned_dispatcher_id: load.assigned_dispatcher_id,
+        dispatcher_name: load.dispatcher_name,
+        driver_name: load.driver_name,
+        truck_number: load.truck_number,
+        order_key: orderMeta.key,
+        order_label: orderMeta.label,
+        unread_count: 0,
+        is_protected: protectedByLoad.get(load.id) ?? false,
+      };
+    });
+  }
+
+  async purgeExpiredLoadChatMessages(options?: { executor?: QueryExecutor }): Promise<number> {
+    const executor = options?.executor ?? this.db;
+
+    const deleteMessagesSql = sqlByDialect(this.dialect, {
+      postgres: `delete from load_chat_messages m
+                 where exists (
+                   select 1
+                   from load_chat_retention r
+                   where r.load_id = m.load_id
+                     and r.purge_after <= now()
+                     and not exists (
+                       select 1
+                       from load_chat_settings s
+                       where s.load_id = r.load_id
+                         and s.protect_from_purge = true
+                     )
+                 )`,
+      sqlite: `delete from load_chat_messages
+               where exists (
+                 select 1
+                 from load_chat_retention r
+                 where r.load_id = load_chat_messages.load_id
+                   and r.purge_after <= datetime('now')
+                   and not exists (
+                     select 1
+                     from load_chat_settings s
+                     where s.load_id = r.load_id
+                       and s.protect_from_purge = 1
+                   )
+               )`,
+    });
+    const deletedMessages = await executor.query(deleteMessagesSql);
+
+    const deleteRetentionSql = sqlByDialect(this.dialect, {
+      postgres: `delete from load_chat_retention r
+                 where r.purge_after <= now()
+                   and not exists (
+                     select 1
+                     from load_chat_settings s
+                     where s.load_id = r.load_id
+                       and s.protect_from_purge = true
+                   )`,
+      sqlite: `delete from load_chat_retention
+               where purge_after <= datetime('now')
+                 and not exists (
+                   select 1
+                   from load_chat_settings s
+                   where s.load_id = load_chat_retention.load_id
+                     and s.protect_from_purge = 1
+                 )`,
+    });
+    await executor.query(deleteRetentionSql);
+
+    return deletedMessages.rowCount;
+  }
+
+  async listLoadChatMessages(loadId: string): Promise<LoadChatMessageRecord[]> {
+    type Row = Omit<LoadChatMessageRecord, 'created_at'> & { created_at: unknown };
+
+    const result = await this.db.query<Row>(
+      `select
+         m.id,
+         m.load_id,
+         m.sender_user_id,
+         m.sender_name,
+         m.message_text,
+         m.message_type,
+         m.target_scope,
+         m.target_user_id,
+         tu.name as target_user_name,
+         m.system_event,
+         m.created_at
+       from load_chat_messages m
+       left join users tu on tu.id = m.target_user_id
+       where m.load_id = $1
+       order by m.created_at asc, m.id asc`,
+      [loadId],
+    );
+
+    return result.rows.map((row) => ({
+      ...row,
+      created_at: normalizeTimestamp(row.created_at),
+    }));
+  }
+
+  async createLoadChatMessage(
+    input: CreateLoadChatMessageInput,
+    options?: { executor?: QueryExecutor },
+  ): Promise<LoadChatMessageRecord> {
+    const executor = options?.executor ?? this.db;
+    const messageText = input.messageText.trim();
+    const senderName = input.senderName.trim();
+    const messageType: ChatMessageType = input.messageType ?? 'MANUAL';
+
+    if (!messageText) {
+      throw new HttpError('messageText is required.', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!senderName) {
+      throw new HttpError('senderName is required.', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!CHAT_MESSAGE_TYPES.includes(messageType)) {
+      throw new HttpError('Invalid messageType.', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!CHAT_TARGET_SCOPES.includes(input.targetScope)) {
+      throw new HttpError('Invalid targetScope.', 400, 'VALIDATION_ERROR');
+    }
+
+    const id = randomUUID();
+    const targetUserId = input.targetScope === 'ORDER_PARTICIPANTS' ? null : input.targetUserId ?? null;
+    const insertSql = sqlByDialect(this.dialect, {
+      postgres: `insert into load_chat_messages (
+          id,
+          load_id,
+          sender_user_id,
+          sender_name,
+          message_text,
+          message_type,
+          target_scope,
+          target_user_id,
+          system_event
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        returning id`,
+      sqlite: `insert into load_chat_messages (
+          id,
+          load_id,
+          sender_user_id,
+          sender_name,
+          message_text,
+          message_type,
+          target_scope,
+          target_user_id,
+          system_event
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    });
+
+    await executor.query(insertSql, [
+      id,
+      input.loadId,
+      input.senderUserId ?? null,
+      senderName,
+      messageText,
+      messageType,
+      input.targetScope,
+      targetUserId,
+      input.systemEvent?.trim() || null,
+    ]);
+
+    const rows = await executor.query<{
+      id: string;
+      load_id: string;
+      sender_user_id: string | null;
+      sender_name: string;
+      message_text: string;
+      message_type: ChatMessageType;
+      target_scope: ChatTargetScope;
+      target_user_id: string | null;
+      target_user_name: string | null;
+      system_event: string | null;
+      created_at: unknown;
+    }>(
+      `select
+         m.id,
+         m.load_id,
+         m.sender_user_id,
+         m.sender_name,
+         m.message_text,
+         m.message_type,
+         m.target_scope,
+         m.target_user_id,
+         tu.name as target_user_name,
+         m.system_event,
+         m.created_at
+       from load_chat_messages m
+       left join users tu on tu.id = m.target_user_id
+       where m.id = $1
+       limit 1`,
+      [id],
+    );
+
+    if (rows.rowCount === 0) {
+      throw new HttpError('Chat message creation failed.', 500, 'INTERNAL_ERROR');
+    }
+
+    const created = rows.rows[0]!;
+    return {
+      ...created,
+      created_at: normalizeTimestamp(created.created_at),
+    };
+  }
+
+  async createSystemLoadChatMessage(
+    input: {
+      loadId: string;
+      messageText: string;
+      systemEvent: string;
+      senderName?: string;
+      targetScope?: ChatTargetScope;
+      targetUserId?: string | null;
+    },
+    options?: { executor?: QueryExecutor },
+  ): Promise<LoadChatMessageRecord> {
+    return this.createLoadChatMessage(
+      {
+        loadId: input.loadId,
+        senderUserId: null,
+        senderName: input.senderName ?? 'System',
+        messageText: input.messageText,
+        messageType: 'SYSTEM',
+        targetScope: input.targetScope ?? 'ORDER_PARTICIPANTS',
+        targetUserId: input.targetUserId ?? null,
+        systemEvent: input.systemEvent,
+      },
+      options,
+    );
+  }
+
+  async deleteLoadChatMessage(messageId: string): Promise<void> {
+    const result = await this.db.query(`delete from load_chat_messages where id = $1`, [messageId]);
+    if (result.rowCount === 0) {
+      throw new HttpError('Chat message not found.', 404, 'NOT_FOUND');
+    }
+  }
+
+  async clearLoadChatMessagesByOrderKey(orderKey: string): Promise<number> {
+    const parsed = parseChatOrderKey(orderKey);
+    let sql = '';
+    let params: unknown[] = [];
+
+    if (parsed.type === 'MCLEOD') {
+      sql = `delete from load_chat_messages
+             where load_id in (
+               select id
+               from loads
+               where mcleod_order_id is not null
+                 and trim(mcleod_order_id) <> ''
+                 and lower(trim(mcleod_order_id)) = $1
+             )`;
+      params = [parsed.value];
+    } else if (parsed.type === 'REF') {
+      sql = `delete from load_chat_messages
+             where load_id in (
+               select id
+               from loads
+               where trim(load_ref_number) <> ''
+                 and lower(trim(load_ref_number)) = $1
+             )`;
+      params = [parsed.value];
+    } else {
+      sql = `delete from load_chat_messages where load_id = $1`;
+      params = [parsed.value];
+    }
+
+    const result = await this.db.query(sql, params);
+    return result.rowCount;
+  }
+
+  async setLoadChatProtection(loadId: string, protectFromPurge: boolean): Promise<void> {
+    if (protectFromPurge) {
+      const upsertSql = sqlByDialect(this.dialect, {
+        postgres: `insert into load_chat_settings (load_id, protect_from_purge)
+                   values ($1, true)
+                   on conflict (load_id)
+                   do update set protect_from_purge = excluded.protect_from_purge`,
+        sqlite: `insert into load_chat_settings (load_id, protect_from_purge)
+                 values ($1, 1)
+                 on conflict(load_id)
+                 do update set protect_from_purge = excluded.protect_from_purge`,
+      });
+      await this.db.query(upsertSql, [loadId]);
+      return;
+    }
+
+    await this.db.query(`delete from load_chat_settings where load_id = $1`, [loadId]);
+  }
+
+  async getLoadChatProtection(loadId: string): Promise<boolean> {
+    const result = await this.db.query<{ protect_from_purge: unknown }>(
+      `select protect_from_purge
+       from load_chat_settings
+       where load_id = $1
+       limit 1`,
+      [loadId],
+    );
+
+    if (result.rowCount === 0) {
+      return false;
+    }
+
+    return toBoolean(result.rows[0]!.protect_from_purge);
+  }
+
+  async markLoadChatRead(loadId: string, userId: string): Promise<void> {
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `insert into load_chat_reads (user_id, load_id, last_read_at)
+                 values ($1, $2, now())
+                 on conflict (user_id, load_id)
+                 do update set last_read_at = excluded.last_read_at`,
+      sqlite: `insert into load_chat_reads (user_id, load_id, last_read_at)
+               values ($1, $2, datetime('now'))
+               on conflict(user_id, load_id)
+               do update set last_read_at = excluded.last_read_at`,
+    });
+
+    await this.db.query(sql, [userId, loadId]);
+  }
+
+  async countUnreadChatMessagesByLoad(
+    loadIds: string[],
+    user: { sub: string; role: UserRole },
+  ): Promise<Map<string, number>> {
+    if (loadIds.length === 0) {
+      return new Map();
+    }
+
+    const params: unknown[] = [user.sub];
+    const loadPlaceholders = loadIds.map((loadId) => {
+      params.push(loadId);
+      return `$${params.length}`;
+    });
+
+    const unreadConditions: string[] = [
+      `m.load_id in (${loadPlaceholders.join(', ')})`,
+      `(m.sender_user_id is null or m.sender_user_id <> $1)`,
+      `r.last_read_at is null or m.created_at > r.last_read_at`,
+    ];
+
+    if (user.role === 'DISPATCHER') {
+      unreadConditions.push(
+        `(m.target_scope = 'ORDER_PARTICIPANTS' or m.target_user_id = $1)`,
+      );
+    }
+
+    const result = await this.db.query<{ load_id: string; unread_count: number | string }>(
+      `select
+         m.load_id,
+         count(*) as unread_count
+       from load_chat_messages m
+       left join load_chat_reads r
+         on r.load_id = m.load_id
+        and r.user_id = $1
+       where ${unreadConditions.map((line) => `(${line})`).join(' and ')}
+       group by m.load_id`,
+      params,
+    );
+
+    const unreadByLoad = new Map<string, number>();
+    for (const row of result.rows) {
+      unreadByLoad.set(row.load_id, Number(row.unread_count) || 0);
+    }
+    return unreadByLoad;
+  }
+
+  async countLoadChatMessagesByLoad(loadIds: string[]): Promise<Map<string, number>> {
+    if (loadIds.length === 0) {
+      return new Map();
+    }
+
+    const params: unknown[] = [];
+    const loadPlaceholders = loadIds.map((loadId) => {
+      params.push(loadId);
+      return `$${params.length}`;
+    });
+
+    const result = await this.db.query<{ load_id: string; message_count: number | string }>(
+      `select
+         load_id,
+         count(*) as message_count
+       from load_chat_messages
+       where load_id in (${loadPlaceholders.join(', ')})
+       group by load_id`,
+      params,
+    );
+
+    const messageCountByLoad = new Map<string, number>();
+    for (const row of result.rows) {
+      messageCountByLoad.set(row.load_id, Number(row.message_count) || 0);
+    }
+    return messageCountByLoad;
+  }
+
   async createLoad(input: CreateLoadInput): Promise<LoadRecord> {
     const rate = asNumber(input.rate, 'rate');
     const miles = asNumber(input.miles, 'miles');
@@ -1244,6 +1836,31 @@ export class FreightRepository {
       throw new HttpError('Updated load not found.', 404, 'NOT_FOUND');
     }
 
+    if (status === 'DELIVERED') {
+      const retentionSql = sqlByDialect(this.dialect, {
+        postgres: `insert into load_chat_retention (load_id, purge_after)
+                   values ($1, $2::timestamptz)
+                   on conflict (load_id)
+                   do update set purge_after = excluded.purge_after`,
+        sqlite: `insert into load_chat_retention (load_id, purge_after)
+                 values ($1, $2)
+                 on conflict(load_id)
+                 do update set purge_after = excluded.purge_after`,
+      });
+      await this.db.query(retentionSql, [loadId, toUtcIsoAfterDays(30)]);
+    } else {
+      await this.db.query(`delete from load_chat_retention where load_id = $1`, [loadId]);
+    }
+
+    const trimmedReason = reason?.trim();
+    if (['DELAYED', 'CANCELED', 'TONU'].includes(status) && trimmedReason) {
+      await this.createSystemLoadChatMessage({
+        loadId,
+        messageText: `${status} reported by ${actorName}: ${trimmedReason}`,
+        systemEvent: status,
+      });
+    }
+
     return load;
   }
 
@@ -1387,6 +2004,15 @@ export class FreightRepository {
           denyReason,
           appendReasonLine(load.reason_log, `Quote denied by ${input.actorName}: ${denyReason}`),
         ]);
+
+        await this.createSystemLoadChatMessage(
+          {
+            loadId: input.loadId,
+            messageText: `Denied by ${input.actorName}: ${denyReason}`,
+            systemEvent: 'DENIED',
+          },
+          { executor: tx },
+        );
       }
 
       const refreshed = await tx.query<LoadRecord>(
@@ -1597,6 +2223,24 @@ export class FreightRepository {
     const refreshed = await this.getLoadById(loadId);
     if (!refreshed) {
       throw new HttpError('Updated load not found.', 404, 'NOT_FOUND');
+    }
+
+    if (updates.status !== undefined && current.status !== refreshed.status) {
+      if (refreshed.status === 'DELIVERED') {
+        const retentionSql = sqlByDialect(this.dialect, {
+          postgres: `insert into load_chat_retention (load_id, purge_after)
+                     values ($1, $2::timestamptz)
+                     on conflict (load_id)
+                     do update set purge_after = excluded.purge_after`,
+          sqlite: `insert into load_chat_retention (load_id, purge_after)
+                   values ($1, $2)
+                   on conflict(load_id)
+                   do update set purge_after = excluded.purge_after`,
+        });
+        await this.db.query(retentionSql, [loadId, toUtcIsoAfterDays(30)]);
+      } else {
+        await this.db.query(`delete from load_chat_retention where load_id = $1`, [loadId]);
+      }
     }
 
     const actorName = updates.actorName?.trim();

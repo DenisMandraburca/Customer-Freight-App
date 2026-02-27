@@ -50,6 +50,45 @@ export interface LoadRecord {
   dispatcher_name: string | null;
 }
 
+export type ChatTargetScope = 'ORDER_PARTICIPANTS' | 'ACCOUNT_MANAGER' | 'DISPATCHER';
+
+export interface LoadChatLoadSummaryRecord {
+  id: string;
+  created_at: string;
+  status: LoadStatus;
+  load_ref_number: string;
+  mcleod_order_id: string | null;
+  customer_name: string | null;
+  pu_city: string;
+  pu_state: string;
+  del_city: string;
+  del_state: string;
+  account_manager_id: string | null;
+  account_manager_name: string | null;
+  assigned_dispatcher_id: string | null;
+  dispatcher_name: string | null;
+  driver_name: string | null;
+  truck_number: string | null;
+  order_key: string;
+  order_label: string;
+  unread_count: number;
+  is_protected: boolean;
+}
+
+export interface LoadChatMessageRecord {
+  id: string;
+  load_id: string;
+  sender_user_id: string | null;
+  sender_name: string;
+  message_text: string;
+  message_type: 'MANUAL' | 'SYSTEM';
+  target_scope: ChatTargetScope;
+  target_user_id: string | null;
+  target_user_name: string | null;
+  system_event: string | null;
+  created_at: string;
+}
+
 export interface CustomerRecord {
   id: string;
   name: string;

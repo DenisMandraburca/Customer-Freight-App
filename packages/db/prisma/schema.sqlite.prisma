@@ -43,6 +43,9 @@ model User {
 
   managedLoads   Load[]   @relation("LoadAccountManager")
   dispatchLoads  Load[]   @relation("LoadDispatcher")
+  sentChatMessages    LoadChatMessage[] @relation("LoadChatSender")
+  targetedChatMessages LoadChatMessage[] @relation("LoadChatTargetUser")
+  chatReadStates       LoadChatRead[]
 
   @@map("users")
 }
@@ -120,10 +123,67 @@ model Load {
   customer             Customer?    @relation(fields: [customerId], references: [id])
   dispatcher           User?        @relation("LoadDispatcher", fields: [assignedDispatcherId], references: [id])
   greenbushBank        GreenbushBank? @relation(fields: [greenbushBankId], references: [id])
+  chatMessages         LoadChatMessage[]
+  chatSettings         LoadChatSetting?
+  chatRetention        LoadChatRetention?
+  chatReadStates       LoadChatRead[]
 
   @@index([status], map: "idx_loads_status")
   @@index([assignedDispatcherId], map: "idx_loads_dispatcher")
   @@index([customerId], map: "idx_loads_customer")
   @@index([puDate], map: "idx_loads_pu_date")
   @@map("loads")
+}
+
+model LoadChatMessage {
+  id           String   @id
+  loadId       String   @map("load_id")
+  senderUserId String?  @map("sender_user_id")
+  senderName   String   @map("sender_name")
+  messageText  String   @map("message_text")
+  messageType  String   @map("message_type")
+  targetScope  String   @map("target_scope")
+  targetUserId String?  @map("target_user_id")
+  systemEvent  String?  @map("system_event")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  load         Load     @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  senderUser   User?    @relation("LoadChatSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  targetUser   User?    @relation("LoadChatTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([loadId, createdAt], map: "idx_load_chat_messages_load_created_at")
+  @@index([targetUserId], map: "idx_load_chat_messages_target_user")
+  @@map("load_chat_messages")
+}
+
+model LoadChatSetting {
+  loadId            String  @id @map("load_id")
+  protectFromPurge  Boolean @default(false) @map("protect_from_purge")
+
+  load              Load    @relation(fields: [loadId], references: [id], onDelete: Cascade)
+
+  @@map("load_chat_settings")
+}
+
+model LoadChatRetention {
+  loadId     String   @id @map("load_id")
+  purgeAfter DateTime @map("purge_after")
+
+  load       Load     @relation(fields: [loadId], references: [id], onDelete: Cascade)
+
+  @@index([purgeAfter], map: "idx_load_chat_retention_purge_after")
+  @@map("load_chat_retention")
+}
+
+model LoadChatRead {
+  userId     String   @map("user_id")
+  loadId     String   @map("load_id")
+  lastReadAt DateTime @default(now()) @map("last_read_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  load       Load     @relation(fields: [loadId], references: [id], onDelete: Cascade)
+
+  @@id([userId, loadId])
+  @@index([loadId, userId], map: "idx_load_chat_reads_load_user")
+  @@map("load_chat_reads")
 }

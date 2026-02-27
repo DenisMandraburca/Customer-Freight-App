@@ -56,7 +56,7 @@
         </div>
       </aside>
 
-      <main class="flex flex-1 flex-col gap-3">
+      <main class="flex h-[calc(100vh-1.5rem)] flex-1 flex-col gap-3 overflow-hidden">
         <header class="glass-panel rounded-2xl px-5 py-3.5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -142,6 +142,10 @@
                 @delete="deleteGreenbushAction"
                 @increment="incrementGreenbushAction"
                 @bulk-replace="bulkReplaceGreenbushAction"
+              />
+              <LoadChatTab
+                v-else-if="activeTab === 'load-chat'"
+                :current-user="currentUser"
               />
               <ReportsTab
                 v-else
@@ -299,6 +303,7 @@ import {
   deleteGreenbush,
   deleteUser,
   getInitialData,
+  getChatLoads,
   incrementGreenbush,
   quoteGreenbush,
   quoteLoad,
@@ -319,6 +324,7 @@ import CustomersTab from './dashboard/CustomersTab.vue';
 import GreenbushTab from './dashboard/GreenbushTab.vue';
 import MyLoadsTab from './dashboard/MyLoadsTab.vue';
 import NewLoadTab from './dashboard/NewLoadTab.vue';
+import LoadChatTab from './dashboard/LoadChatTab.vue';
 import {
   BarChart3,
   Briefcase,
@@ -327,6 +333,7 @@ import {
   Leaf,
   List,
   LogOut,
+  MessageSquare,
   Moon,
   Package,
   Plus,
@@ -337,7 +344,7 @@ import {
 import ReportsTab from './dashboard/ReportsTab.vue';
 import UsersTab from './dashboard/UsersTab.vue';
 
-type TabId = 'new-load' | 'available' | 'my-loads' | 'all-loads' | 'customers' | 'users' | 'greenbush' | 'reports';
+type TabId = 'new-load' | 'available' | 'my-loads' | 'all-loads' | 'customers' | 'users' | 'greenbush' | 'load-chat' | 'reports';
 
 const router = useRouter();
 const queryClient = useQueryClient();
@@ -417,6 +424,7 @@ const canManageGreenbush = computed(() => isAdminLike.value);
 const canViewCustomersTab = computed(() => canManageCustomers.value);
 const canViewUsersTab = computed(() => canManageUsers.value);
 const canViewGreenbushTab = computed(() => canManageGreenbush.value);
+const canViewLoadChatTab = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
 const canViewReportsTab = computed(() => isAdminLike.value || isAccountManager.value);
 const canViewAllLoadsTab = computed(() => isAdminLike.value || isAccountManager.value);
 const canViewMyLoadsTab = computed(() => role.value === 'DISPATCHER' || isAdminLike.value || isAccountManager.value);
@@ -425,6 +433,18 @@ const canViewNewLoadTab = computed(() => canCreateLoad.value);
 const pendingBadge = computed(() =>
   loads.value.filter((load) => load.status === 'PENDING_APPROVAL' || load.status === 'QUOTE_SUBMITTED').length,
 );
+
+const chatBadgeQuery = useQuery({
+  queryKey: ['chat-loads-badge'],
+  queryFn: () => getChatLoads(),
+  enabled: canViewLoadChatTab,
+  refetchInterval: 10000,
+});
+
+const chatUnreadBadge = computed(() => {
+  const rows = chatBadgeQuery.data.value ?? [];
+  return rows.reduce((total, row) => total + (row.unread_count ?? 0), 0);
+});
 
 const navItems = computed(() => {
   const items: Array<{ id: TabId; label: string; icon: any; badge?: number }> = [];
@@ -447,6 +467,9 @@ const navItems = computed(() => {
   }
   if (canViewGreenbushTab.value) {
     items.push({ id: 'greenbush', label: 'Greenbush', icon: Leaf });
+  }
+  if (canViewLoadChatTab.value) {
+    items.push({ id: 'load-chat', label: 'Load Chat', icon: MessageSquare, badge: chatUnreadBadge.value || undefined });
   }
   if (canViewReportsTab.value) {
     items.push({ id: 'reports', label: 'Reports', icon: BarChart3 });

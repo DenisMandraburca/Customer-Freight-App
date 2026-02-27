@@ -550,6 +550,564 @@ integration('API integration', () => {
     expect(missingReason.status).toBe(400);
   });
 
+  it('chat: creates system message when a load is denied with reason', async () => {
+    const createResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'CHAT-DENY-1',
+        puCity: 'Miami',
+        puState: 'FL',
+        delCity: 'Tampa',
+        delState: 'FL',
+        rate: 900,
+        miles: 280,
+      });
+
+    const loadId = createResponse.body.data.id as string;
+
+    await ctx.request
+      .post('/api/customer-freight/book')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({
+        loadId,
+        truckNumber: 'CHAT-TRK-1',
+        driverName: 'Chat Driver',
+      });
+
+    const denyResponse = await ctx.request
+      .post(`/api/customer-freight/loads/${loadId}/decision`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        decision: 'deny',
+        denyReason: 'Rate not approved',
+      });
+
+    expect(denyResponse.status).toBe(200);
+    expect(denyResponse.body.data.status).toBe('AVAILABLE');
+
+    const messagesResponse = await ctx.request
+      .get(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(messagesResponse.status).toBe(200);
+    expect(messagesResponse.body.data).toHaveLength(1);
+    expect(messagesResponse.body.data[0].message_type).toBe('SYSTEM');
+    expect(messagesResponse.body.data[0].system_event).toBe('DENIED');
+    expect(messagesResponse.body.data[0].message_text).toContain('Rate not approved');
+  });
+
+  it('chat: creates system message for DELAYED/CANCELED/TONU status updates', async () => {
+    const createResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'CHAT-DELAY-1',
+        puCity: 'Kansas City',
+        puState: 'MO',
+        delCity: 'Omaha',
+        delState: 'NE',
+        rate: 780,
+        miles: 240,
+      });
+
+    const loadId = createResponse.body.data.id as string;
+
+    await ctx.request
+      .post('/api/customer-freight/book')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({
+        loadId,
+        truckNumber: 'CHAT-TRK-2',
+        driverName: 'Delay Driver',
+      });
+
+    await ctx.request
+      .post(`/api/customer-freight/loads/${loadId}/decision`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        decision: 'accept',
+      });
+
+    const delayedResponse = await ctx.request
+      .patch(`/api/customer-freight/loads/${loadId}/status`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({
+        status: 'DELAYED',
+        reason: 'Dock congestion',
+      });
+
+    expect(delayedResponse.status).toBe(200);
+    expect(delayedResponse.body.data.status).toBe('DELAYED');
+
+    const messagesResponse = await ctx.request
+      .get(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(messagesResponse.status).toBe(200);
+    expect(messagesResponse.body.data).toHaveLength(1);
+    expect(messagesResponse.body.data[0].message_type).toBe('SYSTEM');
+    expect(messagesResponse.body.data[0].system_event).toBe('DELAYED');
+    expect(messagesResponse.body.data[0].message_text).toContain('Dock congestion');
+  });
+
+  it('chat: hides Delivered/Brokerage loads and does not create chat for never-transitioned AVAILABLE loads', async () => {
+    const availableLoad = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'CHAT-HIDE-AVAILABLE',
+        puCity: 'Austin',
+        puState: 'TX',
+        delCity: 'Dallas',
+        delState: 'TX',
+        rate: 700,
+        miles: 200,
+      });
+
+    const coveredLoad = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-HIDE-COVERED',
+        puCity: 'Reno',
+        puState: 'NV',
+        delCity: 'Sacramento',
+        delState: 'CA',
+        rate: 800,
+        miles: 150,
+      });
+
+    const brokerageLoad = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'CHAT-HIDE-BROKERAGE',
+        puCity: 'Boise',
+        puState: 'ID',
+        delCity: 'Salt Lake City',
+        delState: 'UT',
+        rate: 850,
+        miles: 300,
+        status: 'BROKERAGE',
+      });
+
+    const coveredLoadId = coveredLoad.body.data.id as string;
+
+    const toDelivered = await ctx.request
+      .patch(`/api/customer-freight/loads/${coveredLoadId}/status`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({
+        status: 'DELIVERED',
+      });
+
+    expect(toDelivered.status).toBe(200);
+
+    const chatLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+
+    expect(chatLoads.status).toBe(200);
+    const refs = chatLoads.body.data.map((row: { load_ref_number: string }) => row.load_ref_number);
+    expect(refs).not.toContain(availableLoad.body.data.load_ref_number);
+    expect(refs).not.toContain(coveredLoad.body.data.load_ref_number);
+    expect(refs).not.toContain(brokerageLoad.body.data.load_ref_number);
+  });
+
+  it('chat: delivered threads are hidden by default, shown with includeDelivered, and can be pinned via protection', async () => {
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-DELIVERED-TOGGLE',
+        puCity: 'Fargo',
+        puState: 'ND',
+        delCity: 'Sioux Falls',
+        delState: 'SD',
+        rate: 880,
+        miles: 230,
+        status: 'COVERED',
+      });
+
+    const loadId = loadResponse.body.data.id as string;
+
+    const messageResponse = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Delivered visibility test',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+    expect(messageResponse.status).toBe(201);
+
+    const deliveredResponse = await ctx.request
+      .patch(`/api/customer-freight/loads/${loadId}/status`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({
+        status: 'DELIVERED',
+      });
+    expect(deliveredResponse.status).toBe(200);
+
+    const hiddenByDefault = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(hiddenByDefault.status).toBe(200);
+    expect(hiddenByDefault.body.data.some((row: { id: string }) => row.id === loadId)).toBe(false);
+
+    const shownWhenIncluded = await ctx.request
+      .get('/api/customer-freight/chat/loads?includeDelivered=1')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(shownWhenIncluded.status).toBe(200);
+    expect(shownWhenIncluded.body.data.some((row: { id: string }) => row.id === loadId)).toBe(true);
+
+    const protectResponse = await ctx.request
+      .patch(`/api/customer-freight/chat/loads/${loadId}/protection`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        protectFromPurge: true,
+      });
+    expect(protectResponse.status).toBe(200);
+    expect(protectResponse.body.data.protectFromPurge).toBe(true);
+
+    const shownWhenProtected = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(shownWhenProtected.status).toBe(200);
+    const protectedRow = shownWhenProtected.body.data.find((row: { id: string }) => row.id === loadId);
+    expect(protectedRow).toBeTruthy();
+    expect(protectedRow.is_protected).toBe(true);
+
+    const unprotectResponse = await ctx.request
+      .patch(`/api/customer-freight/chat/loads/${loadId}/protection`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        protectFromPurge: false,
+      });
+    expect(unprotectResponse.status).toBe(200);
+
+    const hiddenAgain = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(hiddenAgain.status).toBe(200);
+    expect(hiddenAgain.body.data.some((row: { id: string }) => row.id === loadId)).toBe(false);
+  });
+
+  it('chat: role-scoped chat loads visibility works for admin, AM, full-access AM, and dispatcher', async () => {
+    const accountManagerFull = await ctx.repository.createUser({
+      email: 'sales.full@afctransport.com',
+      name: 'Account Manager Full',
+      role: 'ACCOUNT_MANAGER',
+      fullLoadAccess: true,
+    });
+
+    const dispatcherTwo = await ctx.repository.createUser({
+      email: 'dispatch.two@afclogistics.com',
+      name: 'Dispatcher Two',
+      role: 'DISPATCHER',
+    });
+
+    const loadOneResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-SCOPE-1',
+        puCity: 'Denver',
+        puState: 'CO',
+        delCity: 'Boulder',
+        delState: 'CO',
+        rate: 600,
+        miles: 120,
+      });
+
+    const loadTwoResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: accountManagerFull.id,
+        assignedDispatcherId: dispatcherTwo.id,
+        loadRefNumber: 'CHAT-SCOPE-2',
+        puCity: 'Phoenix',
+        puState: 'AZ',
+        delCity: 'Tucson',
+        delState: 'AZ',
+        rate: 700,
+        miles: 110,
+      });
+
+    expect(loadOneResponse.status).toBe(201);
+    expect(loadTwoResponse.status).toBe(201);
+
+    const adminLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(adminLoads.status).toBe(200);
+    expect(adminLoads.body.data).toHaveLength(2);
+
+    const accountManagerLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(accountManagerLoads.status).toBe(200);
+    expect(accountManagerLoads.body.data).toHaveLength(1);
+    expect(accountManagerLoads.body.data[0].load_ref_number).toBe('CHAT-SCOPE-1');
+
+    const fullAccessLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(accountManagerFull));
+    expect(fullAccessLoads.status).toBe(200);
+    expect(fullAccessLoads.body.data).toHaveLength(2);
+
+    const dispatcherLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher));
+    expect(dispatcherLoads.status).toBe(200);
+    expect(dispatcherLoads.body.data).toHaveLength(1);
+    expect(dispatcherLoads.body.data[0].load_ref_number).toBe('CHAT-SCOPE-1');
+  });
+
+  it('chat: dispatcher sees own + addressed messages and cannot see account-manager-only messages from others', async () => {
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-FILTER-1',
+        puCity: 'Raleigh',
+        puState: 'NC',
+        delCity: 'Charlotte',
+        delState: 'NC',
+        rate: 650,
+        miles: 150,
+      });
+
+    const loadId = loadResponse.body.data.id as string;
+
+    const managerToAm = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Manager to AM only',
+        targetScope: 'ACCOUNT_MANAGER',
+      });
+    expect(managerToAm.status).toBe(201);
+
+    const managerBroadcast = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Manager broadcast',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+    expect(managerBroadcast.status).toBe(201);
+
+    const dispatcherOwn = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({
+        messageText: 'Dispatcher own message',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+    expect(dispatcherOwn.status).toBe(201);
+
+    const managerToDispatcher = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Manager to dispatcher',
+        targetScope: 'DISPATCHER',
+      });
+    expect(managerToDispatcher.status).toBe(201);
+
+    const dispatcherView = await ctx.request
+      .get(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher));
+
+    expect(dispatcherView.status).toBe(200);
+    const visibleTexts = dispatcherView.body.data.map((row: { message_text: string }) => row.message_text);
+    expect(visibleTexts).toContain('Manager broadcast');
+    expect(visibleTexts).toContain('Dispatcher own message');
+    expect(visibleTexts).toContain('Manager to dispatcher');
+    expect(visibleTexts).not.toContain('Manager to AM only');
+  });
+
+  it('chat: message creation validates target assignment', async () => {
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'CHAT-VALIDATE-1',
+        puCity: 'Columbus',
+        puState: 'OH',
+        delCity: 'Dayton',
+        delState: 'OH',
+        rate: 500,
+        miles: 80,
+        status: 'COVERED',
+      });
+
+    const loadId = loadResponse.body.data.id as string;
+
+    const response = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Ping dispatcher',
+        targetScope: 'DISPATCHER',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('VALIDATION_ERROR');
+  });
+
+  it('chat: admin can delete a message and clear an entire order thread', async () => {
+    const firstLoadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-CLEAR-A',
+        mcleodOrderId: 'MC-THREAD-1',
+        puCity: 'Seattle',
+        puState: 'WA',
+        delCity: 'Tacoma',
+        delState: 'WA',
+        rate: 1000,
+        miles: 100,
+      });
+
+    const secondLoadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-CLEAR-B',
+        mcleodOrderId: 'MC-THREAD-1',
+        puCity: 'Spokane',
+        puState: 'WA',
+        delCity: 'Yakima',
+        delState: 'WA',
+        rate: 900,
+        miles: 130,
+      });
+
+    const firstLoadId = firstLoadResponse.body.data.id as string;
+    const secondLoadId = secondLoadResponse.body.data.id as string;
+
+    const firstMessage = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${firstLoadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Message one',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+    expect(firstMessage.status).toBe(201);
+
+    const secondMessage = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${secondLoadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Message two',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+    expect(secondMessage.status).toBe(201);
+
+    const deleteResponse = await ctx.request
+      .delete(`/api/customer-freight/chat/messages/${firstMessage.body.data.id}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(deleteResponse.status).toBe(204);
+
+    const afterDelete = await ctx.request
+      .get(`/api/customer-freight/chat/loads/${firstLoadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(afterDelete.status).toBe(200);
+    expect(afterDelete.body.data).toHaveLength(0);
+
+    const chatLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    const loadThread = chatLoads.body.data.find((row: { id: string; order_key: string }) => row.id === secondLoadId);
+    expect(loadThread).toBeTruthy();
+
+    const clearResponse = await ctx.request
+      .post('/api/customer-freight/chat/orders/clear')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ orderKey: loadThread.order_key });
+
+    expect(clearResponse.status).toBe(200);
+    expect(clearResponse.body.data.deletedCount).toBe(1);
+
+    const afterClear = await ctx.request
+      .get(`/api/customer-freight/chat/loads/${secondLoadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(afterClear.status).toBe(200);
+    expect(afterClear.body.data).toHaveLength(0);
+  });
+
+  it('chat: non-admin users cannot delete messages or clear threads', async () => {
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        assignedDispatcherId: ctx.users.dispatcher.id,
+        loadRefNumber: 'CHAT-PERM-1',
+        puCity: 'Portland',
+        puState: 'OR',
+        delCity: 'Eugene',
+        delState: 'OR',
+        rate: 700,
+        miles: 90,
+      });
+
+    const loadId = loadResponse.body.data.id as string;
+
+    const messageResponse = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Permission test',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+
+    const messageId = messageResponse.body.data.id as string;
+
+    const deleteDenied = await ctx.request
+      .delete(`/api/customer-freight/chat/messages/${messageId}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher));
+    expect(deleteDenied.status).toBe(403);
+
+    const chatLoads = await ctx.request
+      .get('/api/customer-freight/chat/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    const orderKey = chatLoads.body.data[0]?.order_key as string;
+
+    const clearDenied = await ctx.request
+      .post('/api/customer-freight/chat/orders/clear')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher))
+      .send({ orderKey });
+    expect(clearDenied.status).toBe(403);
+  });
+
   it('customer-freight:admin permission grants effective admin access', async () => {
     const viewer = await ctx.repository.createUser({
       email: 'viewer.admin@afctransport.com',

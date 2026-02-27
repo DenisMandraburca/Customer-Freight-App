@@ -93,10 +93,51 @@ const sqliteSchemaSql = `
     foreign key (greenbush_bank_id) references greenbush_bank(id) on update cascade on delete set null
   );
 
+  create table if not exists load_chat_messages (
+    id text primary key,
+    load_id text not null,
+    sender_user_id text,
+    sender_name text not null,
+    message_text text not null,
+    message_type text not null,
+    target_scope text not null,
+    target_user_id text,
+    system_event text,
+    created_at text not null default (datetime('now')),
+    foreign key (load_id) references loads(id) on update cascade on delete cascade,
+    foreign key (sender_user_id) references users(id) on update cascade on delete set null,
+    foreign key (target_user_id) references users(id) on update cascade on delete set null
+  );
+
+  create table if not exists load_chat_settings (
+    load_id text primary key,
+    protect_from_purge integer not null default 0,
+    foreign key (load_id) references loads(id) on update cascade on delete cascade
+  );
+
+  create table if not exists load_chat_retention (
+    load_id text primary key,
+    purge_after text not null,
+    foreign key (load_id) references loads(id) on update cascade on delete cascade
+  );
+
+  create table if not exists load_chat_reads (
+    user_id text not null,
+    load_id text not null,
+    last_read_at text not null default (datetime('now')),
+    primary key (user_id, load_id),
+    foreign key (user_id) references users(id) on update cascade on delete cascade,
+    foreign key (load_id) references loads(id) on update cascade on delete cascade
+  );
+
   create index if not exists idx_loads_status on loads(status);
   create index if not exists idx_loads_dispatcher on loads(assigned_dispatcher_id);
   create index if not exists idx_loads_customer on loads(customer_id);
   create index if not exists idx_loads_pu_date on loads(pu_date);
+  create index if not exists idx_load_chat_messages_load_created_at on load_chat_messages(load_id, created_at);
+  create index if not exists idx_load_chat_messages_target_user on load_chat_messages(target_user_id);
+  create index if not exists idx_load_chat_retention_purge_after on load_chat_retention(purge_after);
+  create index if not exists idx_load_chat_reads_load_user on load_chat_reads(load_id, user_id);
   create unique index if not exists idx_loads_legacy_id_unique on loads(legacy_id);
   create unique index if not exists idx_greenbush_legacy_id_unique on greenbush_bank(legacy_id);
 `;
