@@ -30,16 +30,6 @@ type BulkImportError = {
   message: string;
 };
 
-function ensureCustomersAccess(user: { role: string; full_load_access: boolean }): void {
-  if (user.role === 'ACCOUNT_MANAGER' && !user.full_load_access) {
-    throw new HttpError(
-      'Account managers without full access cannot manage customers.',
-      403,
-      'PERMISSION_DENIED',
-    );
-  }
-}
-
 function parseBoolean(value: string | undefined): boolean {
   const normalized = (value ?? '').trim().toLowerCase();
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y';
@@ -78,7 +68,6 @@ export function adminRouter(repository: FreightRepository): Router {
     ['/admin/customers', '/customers'],
     requireRoles(['ADMIN', 'MANAGER', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
-      ensureCustomersAccess(req.user!);
       const customers = await repository.listCustomers();
       res.json({ success: true, data: customers });
     }),
@@ -88,7 +77,6 @@ export function adminRouter(repository: FreightRepository): Router {
     ['/admin/customers', '/customers'],
     requireRoles(['ADMIN', 'MANAGER', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
-      ensureCustomersAccess(req.user!);
       const payload = customerSchema.parse(req.body);
       const customer = await repository.createCustomer(payload);
       res.status(201).json({ success: true, data: customer });
@@ -99,7 +87,6 @@ export function adminRouter(repository: FreightRepository): Router {
     ['/admin/customers/bulk', '/customers/bulk'],
     requireRoles(['ADMIN', 'MANAGER', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
-      ensureCustomersAccess(req.user!);
       const parsed = bulkRowsSchema.parse(req.body);
 
       const errors: BulkImportError[] = [];
@@ -145,7 +132,6 @@ export function adminRouter(repository: FreightRepository): Router {
     ['/admin/customers/:id', '/customers/:id'],
     requireRoles(['ADMIN', 'MANAGER', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
-      ensureCustomersAccess(req.user!);
       const payload = customerSchema.parse(req.body);
       const customer = await repository.updateCustomer(req.params.id, payload);
       res.json({ success: true, data: customer });
@@ -154,7 +140,7 @@ export function adminRouter(repository: FreightRepository): Router {
 
   router.delete(
     ['/admin/customers/:id', '/customers/:id'],
-    requireRoles(['ADMIN', 'MANAGER']),
+    requireRoles(['ADMIN', 'MANAGER', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       await repository.deleteCustomer(req.params.id);
       res.status(204).send();

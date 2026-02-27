@@ -339,10 +339,7 @@ const scopedLoads = computed(() => {
   }
 
   if (user.role === 'ACCOUNT_MANAGER') {
-    if (user.full_load_access) {
-      return props.loads;
-    }
-    return props.loads.filter((load) => load.account_manager_id === user.sub);
+    return props.loads;
   }
 
   if (user.role === 'DISPATCHER') {
@@ -368,7 +365,9 @@ const activeLoads = computed(() =>
   scopedLoads.value.filter((load) => ['COVERED', 'LOADED', 'DELAYED'].includes(load.status)),
 );
 
-const canEditSpecs = computed(() => props.user?.role === 'ADMIN' || props.user?.role === 'MANAGER');
+const canEditSpecs = computed(() =>
+  props.user?.role === 'ADMIN' || props.user?.role === 'MANAGER' || props.user?.role === 'ACCOUNT_MANAGER',
+);
 
 function toDateInputValue(value: string | null | undefined): string {
   if (!value) {

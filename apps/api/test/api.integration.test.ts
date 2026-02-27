@@ -470,6 +470,196 @@ integration('API integration', () => {
     expect(decisionResponse.body.data.mcleod_order_id).toBe('MC-1005A');
   });
 
+  it('account manager can book and quote available loads', async () => {
+    const bookLoadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'AM-BOOK-1',
+        puCity: 'El Paso',
+        puState: 'TX',
+        delCity: 'Albuquerque',
+        delState: 'NM',
+        rate: 900,
+        miles: 250,
+      });
+    expect(bookLoadResponse.status).toBe(201);
+
+    const bookResponse = await ctx.request
+      .post('/api/customer-freight/book')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        loadId: bookLoadResponse.body.data.id,
+        truckNumber: 'AM-TRK-1',
+        driverName: 'Account Manager Booker',
+      });
+    expect(bookResponse.status).toBe(200);
+    expect(bookResponse.body.data.status).toBe('PENDING_APPROVAL');
+
+    const quoteLoadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'AM-QUOTE-1',
+        puCity: 'Buffalo',
+        puState: 'NY',
+        delCity: 'Rochester',
+        delState: 'NY',
+        rate: 500,
+        miles: 80,
+      });
+    expect(quoteLoadResponse.status).toBe(201);
+
+    const quoteResponse = await ctx.request
+      .post(`/api/customer-freight/loads/${quoteLoadResponse.body.data.id}/quote`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        pickupDate: '2026-03-02',
+      });
+    expect(quoteResponse.status).toBe(201);
+    expect(quoteResponse.body.data.status).toBe('QUOTE_SUBMITTED');
+  });
+
+  it('account manager can delete loads', async () => {
+    const createResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        loadRefNumber: 'AM-DELETE-LOAD-1',
+        puCity: 'Boise',
+        puState: 'ID',
+        delCity: 'Salt Lake City',
+        delState: 'UT',
+        rate: 750,
+        miles: 320,
+      });
+    expect(createResponse.status).toBe(201);
+
+    const deleteResponse = await ctx.request
+      .delete(`/api/customer-freight/loads/${createResponse.body.data.id}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(deleteResponse.status).toBe(204);
+
+    const verifyResponse = await ctx.request
+      .get('/api/customer-freight/loads?ref=AM-DELETE-LOAD-1')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(verifyResponse.status).toBe(200);
+    expect(verifyResponse.body.data).toHaveLength(0);
+  });
+
+  it('account manager can mutate greenbush routes', async () => {
+    const createResponse = await ctx.request
+      .post('/api/customer-freight/greenbush')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        pickupLocation: 'Harrisburg',
+        destination: 'Philadelphia',
+        receivingHours: '06:00 - 15:00',
+        price: 1200,
+        tarp: 'No',
+        remainingCount: 3,
+        specialNotes: 'AM route',
+      });
+    expect(createResponse.status).toBe(201);
+    const rowId = createResponse.body.data.id as string;
+
+    const updateResponse = await ctx.request
+      .patch(`/api/customer-freight/greenbush/${rowId}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        pickupLocation: 'Harrisburg',
+        destination: 'Philadelphia',
+        receivingHours: '06:00 - 16:00',
+        price: 1250,
+        tarp: 'Yes',
+        remainingCount: 4,
+        specialNotes: 'AM route updated',
+      });
+    expect(updateResponse.status).toBe(200);
+
+    const incrementResponse = await ctx.request
+      .post(`/api/customer-freight/greenbush/${rowId}/increment`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(incrementResponse.status).toBe(200);
+
+    const deleteResponse = await ctx.request
+      .delete(`/api/customer-freight/greenbush/${rowId}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(deleteResponse.status).toBe(204);
+
+    const bulkReplaceResponse = await ctx.request
+      .post('/api/customer-freight/greenbush/bulk-replace')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({
+        rows: [
+          {
+            pickupLocation: 'York',
+            destination: 'Lancaster',
+            receivingHours: '07:00 - 14:00',
+            price: 980,
+            tarp: 'No',
+            remainingCount: 2,
+            specialNotes: 'Bulk row',
+          },
+        ],
+      });
+    expect(bulkReplaceResponse.status).toBe(200);
+    expect(bulkReplaceResponse.body.data).toHaveLength(1);
+  });
+
+  it('account manager can delete customers', async () => {
+    const customer = await ctx.repository.createCustomer({
+      name: 'Delete Me Customer',
+      type: 'Broker',
+      quoteAccept: false,
+    });
+
+    const deleteResponse = await ctx.request
+      .delete(`/api/customer-freight/customers/${customer.id}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(deleteResponse.status).toBe(204);
+
+    const customersResponse = await ctx.request
+      .get('/api/customer-freight/customers')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(customersResponse.status).toBe(200);
+    expect(customersResponse.body.data.some((row: { id: string }) => row.id === customer.id)).toBe(false);
+  });
+
+  it('account manager receives users and customers in initial-data payload', async () => {
+    const response = await ctx.request
+      .get('/api/customer-freight/initial-data')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.data.users)).toBe(true);
+    expect(response.body.data.users.length).toBeGreaterThan(0);
+    expect(response.body.data.users.some((row: { id: string }) => row.id === ctx.users.dispatcher.id)).toBe(true);
+    expect(Array.isArray(response.body.data.customers)).toBe(true);
+    expect(response.body.data.customers.some((row: { id: string }) => row.id === ctx.customer.id)).toBe(true);
+  });
+
+  it('account manager is denied settings-only endpoints', async () => {
+    const usersResponse = await ctx.request
+      .get('/api/customer-freight/users')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(usersResponse.status).toBe(403);
+
+    const bulkLoadsResponse = await ctx.request
+      .post('/api/customer-freight/loads/bulk')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({ rows: [] });
+    expect(bulkLoadsResponse.status).toBe(403);
+
+    const deleteAllResponse = await ctx.request
+      .delete('/api/customer-freight/loads/dev/all')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(deleteAllResponse.status).toBe(403);
+  });
+
   it('deny decision restores AVAILABLE and releases Greenbush reservation', async () => {
     const greenbush = await ctx.repository.createGreenbush({
       pickupLocation: 'Pittsburgh',
@@ -801,12 +991,11 @@ integration('API integration', () => {
     expect(hiddenAgain.body.data.some((row: { id: string }) => row.id === loadId)).toBe(false);
   });
 
-  it('chat: role-scoped chat loads visibility works for admin, AM, full-access AM, and dispatcher', async () => {
-    const accountManagerFull = await ctx.repository.createUser({
-      email: 'sales.full@afctransport.com',
-      name: 'Account Manager Full',
+  it('chat: role-scoped chat loads visibility works for admin, AM, another AM, and dispatcher', async () => {
+    const anotherAccountManager = await ctx.repository.createUser({
+      email: 'sales.other@afctransport.com',
+      name: 'Account Manager Other',
       role: 'ACCOUNT_MANAGER',
-      fullLoadAccess: true,
     });
 
     const dispatcherTwo = await ctx.repository.createUser({
@@ -836,7 +1025,7 @@ integration('API integration', () => {
       .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
       .send({
         customerId: ctx.customer.id,
-        accountManagerId: accountManagerFull.id,
+        accountManagerId: anotherAccountManager.id,
         assignedDispatcherId: dispatcherTwo.id,
         loadRefNumber: 'CHAT-SCOPE-2',
         puCity: 'Phoenix',
@@ -860,14 +1049,13 @@ integration('API integration', () => {
       .get('/api/customer-freight/chat/loads')
       .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
     expect(accountManagerLoads.status).toBe(200);
-    expect(accountManagerLoads.body.data).toHaveLength(1);
-    expect(accountManagerLoads.body.data[0].load_ref_number).toBe('CHAT-SCOPE-1');
+    expect(accountManagerLoads.body.data).toHaveLength(2);
 
-    const fullAccessLoads = await ctx.request
+    const anotherAccountManagerLoads = await ctx.request
       .get('/api/customer-freight/chat/loads')
-      .set('x-test-session', ctx.sessionHeaderFor(accountManagerFull));
-    expect(fullAccessLoads.status).toBe(200);
-    expect(fullAccessLoads.body.data).toHaveLength(2);
+      .set('x-test-session', ctx.sessionHeaderFor(anotherAccountManager));
+    expect(anotherAccountManagerLoads.status).toBe(200);
+    expect(anotherAccountManagerLoads.body.data).toHaveLength(2);
 
     const dispatcherLoads = await ctx.request
       .get('/api/customer-freight/chat/loads')
@@ -1062,7 +1250,7 @@ integration('API integration', () => {
     expect(afterClear.body.data).toHaveLength(0);
   });
 
-  it('chat: non-admin users cannot delete messages or clear threads', async () => {
+  it('chat: dispatcher cannot moderate threads while account manager can', async () => {
     const loadResponse = await ctx.request
       .post('/api/customer-freight/loads')
       .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
@@ -1081,25 +1269,44 @@ integration('API integration', () => {
 
     const loadId = loadResponse.body.data.id as string;
 
-    const messageResponse = await ctx.request
+    const firstMessageResponse = await ctx.request
       .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
       .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
       .send({
         messageText: 'Permission test',
         targetScope: 'ORDER_PARTICIPANTS',
       });
-
-    const messageId = messageResponse.body.data.id as string;
-
-    const deleteDenied = await ctx.request
-      .delete(`/api/customer-freight/chat/messages/${messageId}`)
-      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher));
-    expect(deleteDenied.status).toBe(403);
+    expect(firstMessageResponse.status).toBe(201);
 
     const chatLoads = await ctx.request
       .get('/api/customer-freight/chat/loads')
       .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
     const orderKey = chatLoads.body.data[0]?.order_key as string;
+
+    const deleteByAccountManager = await ctx.request
+      .delete(`/api/customer-freight/chat/messages/${firstMessageResponse.body.data.id}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager));
+    expect(deleteByAccountManager.status).toBe(204);
+
+    const secondMessageResponse = await ctx.request
+      .post(`/api/customer-freight/chat/loads/${loadId}/messages`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        messageText: 'Permission test 2',
+        targetScope: 'ORDER_PARTICIPANTS',
+      });
+    expect(secondMessageResponse.status).toBe(201);
+
+    const deleteDenied = await ctx.request
+      .delete(`/api/customer-freight/chat/messages/${secondMessageResponse.body.data.id}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.dispatcher));
+    expect(deleteDenied.status).toBe(403);
+
+    const clearByAccountManager = await ctx.request
+      .post('/api/customer-freight/chat/orders/clear')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.accountManager))
+      .send({ orderKey });
+    expect(clearByAccountManager.status).toBe(200);
 
     const clearDenied = await ctx.request
       .post('/api/customer-freight/chat/orders/clear')

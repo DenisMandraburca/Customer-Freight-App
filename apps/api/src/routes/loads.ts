@@ -132,10 +132,7 @@ function canManageLoadByOwnership(user: { sub: string; role: UserRole; full_load
   }
 
   if (user.role === 'ACCOUNT_MANAGER') {
-    if (user.full_load_access) {
-      return true;
-    }
-    return load.account_manager_id === user.sub;
+    return true;
   }
 
   if (user.role === 'DISPATCHER') {
@@ -154,10 +151,7 @@ function scopeLoadsByRole(
   }
 
   if (user.role === 'ACCOUNT_MANAGER') {
-    if (user.full_load_access) {
-      return loads;
-    }
-    return loads.filter((load) => load.account_manager_id === user.sub || load.status === 'AVAILABLE');
+    return loads;
   }
 
   if (user.role === 'DISPATCHER') {
@@ -246,17 +240,6 @@ export function loadsRouter(repository: FreightRepository): Router {
 
       const requestedAccountManagerId = parsed.accountManagerId ?? undefined;
       let accountManagerId = requestedAccountManagerId ?? user.sub;
-
-      if (user.role === 'ACCOUNT_MANAGER' && !user.full_load_access) {
-        accountManagerId = user.sub;
-      } else if (
-        user.role === 'ACCOUNT_MANAGER' &&
-        user.full_load_access &&
-        requestedAccountManagerId &&
-        requestedAccountManagerId !== user.sub
-      ) {
-        accountManagerId = requestedAccountManagerId;
-      }
 
       if (!isAdminLike(user.role) && user.role !== 'ACCOUNT_MANAGER' && accountManagerId !== user.sub) {
         throw new HttpError('Cannot create loads for another account manager.', 403, 'PERMISSION_DENIED');
@@ -442,7 +425,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.delete(
     '/loads/:id',
-    requireRoles(['MANAGER', 'ADMIN']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       await repository.deleteLoad(req.params.id);
       res.status(204).send();
@@ -451,7 +434,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.post(
     '/loads/:id/book',
-    requireRoles(['DISPATCHER', 'MANAGER', 'ADMIN']),
+    requireRoles(['DISPATCHER', 'MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const parsed = bookSchema.parse(req.body);
       const load = await repository.bookLoad({
@@ -467,7 +450,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.post(
     '/book',
-    requireRoles(['DISPATCHER', 'MANAGER', 'ADMIN']),
+    requireRoles(['DISPATCHER', 'MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const parsed = bookSchema.parse(req.body);
       if (!parsed.loadId) {
@@ -487,7 +470,7 @@ export function loadsRouter(repository: FreightRepository): Router {
 
   router.post(
     '/loads/:id/quote',
-    requireRoles(['DISPATCHER', 'MANAGER', 'ADMIN']),
+    requireRoles(['DISPATCHER', 'MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const parsed = quoteSchema.parse(req.body);
       const pickupDate = parsed.pickupDate ?? parsed.proposedDate ?? parsed.proposed_date;
@@ -657,15 +640,6 @@ export function loadsRouter(repository: FreightRepository): Router {
             'PERMISSION_DENIED',
           );
         }
-      }
-
-      if (
-        req.user!.role === 'ACCOUNT_MANAGER' &&
-        !req.user!.full_load_access &&
-        parsed.accountManagerId &&
-        parsed.accountManagerId !== req.user!.sub
-      ) {
-        throw new HttpError('Cannot reassign load to another account manager.', 403, 'PERMISSION_DENIED');
       }
 
       if (parsed.miles !== undefined || parsed.status !== undefined) {

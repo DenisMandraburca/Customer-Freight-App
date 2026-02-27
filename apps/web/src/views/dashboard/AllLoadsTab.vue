@@ -511,10 +511,7 @@ const scopedLoads = computed(() => {
   }
 
   if (user.role === 'ACCOUNT_MANAGER') {
-    if (user.full_load_access) {
-      return props.loads;
-    }
-    return props.loads.filter((load) => load.account_manager_id === user.sub);
+    return props.loads;
   }
 
   return [];
@@ -602,12 +599,12 @@ const accountManagerUsers = computed(() =>
 
 const canEditSpecs = computed(() => {
   const role = props.currentUser?.role;
-  return role === 'ADMIN' || role === 'MANAGER';
+  return role === 'ADMIN' || role === 'MANAGER' || role === 'ACCOUNT_MANAGER';
 });
 
 const canDeleteLoads = computed(() => {
   const role = props.currentUser?.role;
-  return role === 'ADMIN' || role === 'MANAGER';
+  return role === 'ADMIN' || role === 'MANAGER' || role === 'ACCOUNT_MANAGER';
 });
 
 const customerTypeById = computed(() => {

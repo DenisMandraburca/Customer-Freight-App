@@ -53,7 +53,7 @@ export function greenbushRouter(repository: FreightRepository): Router {
 
   router.post(
     '/greenbush',
-    requireRoles(['MANAGER', 'ADMIN']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const parsed = greenbushMutationSchema.parse(req.body);
       const row = await repository.createGreenbush(parsed);
@@ -63,7 +63,7 @@ export function greenbushRouter(repository: FreightRepository): Router {
 
   router.patch(
     '/greenbush/:id',
-    requireRoles(['MANAGER', 'ADMIN']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const parsed = greenbushMutationSchema.parse(req.body);
       const row = await repository.updateGreenbush(req.params.id, parsed);
@@ -73,7 +73,7 @@ export function greenbushRouter(repository: FreightRepository): Router {
 
   router.post(
     '/greenbush/:id/increment',
-    requireRoles(['MANAGER', 'ADMIN']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const row = await repository.incrementGreenbush(req.params.id);
       res.json({ success: true, data: row });
@@ -82,7 +82,7 @@ export function greenbushRouter(repository: FreightRepository): Router {
 
   router.delete(
     '/greenbush/:id',
-    requireRoles(['MANAGER', 'ADMIN']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       await repository.deleteGreenbush(req.params.id);
       res.status(204).send();
@@ -91,7 +91,7 @@ export function greenbushRouter(repository: FreightRepository): Router {
 
   router.post(
     ['/greenbush/bulk', '/greenbush/bulk-replace'],
-    requireRoles(['MANAGER', 'ADMIN']),
+    requireRoles(['MANAGER', 'ADMIN', 'ACCOUNT_MANAGER']),
     asyncHandler(async (req, res) => {
       const parsed = greenbushBulkReplaceSchema.parse(req.body);
       const rows = await repository.bulkReplaceGreenbush(parsed.rows);

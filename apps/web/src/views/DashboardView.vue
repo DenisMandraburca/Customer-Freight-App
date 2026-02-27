@@ -148,13 +148,16 @@
                 :current-user="currentUser"
               />
               <ReportsTab
-                v-else
+                v-else-if="activeTab === 'reports'"
                 :loads="loads"
                 :customers="customers"
                 :users="users"
                 :current-user="currentUser"
                 :is-refreshing="query.isFetching.value"
                 @refresh="refreshData"
+              />
+              <SettlementTab
+                v-else-if="activeTab === 'settlement'"
               />
             </template>
           </div>
@@ -342,9 +345,20 @@ import {
   Users,
 } from 'lucide-vue-next';
 import ReportsTab from './dashboard/ReportsTab.vue';
+import SettlementTab from './dashboard/SettlementTab.vue';
 import UsersTab from './dashboard/UsersTab.vue';
 
-type TabId = 'new-load' | 'available' | 'my-loads' | 'all-loads' | 'customers' | 'users' | 'greenbush' | 'load-chat' | 'reports';
+type TabId =
+  | 'new-load'
+  | 'available'
+  | 'my-loads'
+  | 'all-loads'
+  | 'customers'
+  | 'greenbush'
+  | 'load-chat'
+  | 'reports'
+  | 'settlement'
+  | 'users';
 
 const router = useRouter();
 const queryClient = useQueryClient();
@@ -409,23 +423,23 @@ const greenbush = computed(() => query.data.value?.greenbush ?? []);
 
 const isAdminLike = computed(() => role.value === 'ADMIN' || role.value === 'MANAGER');
 const isAccountManager = computed(() => role.value === 'ACCOUNT_MANAGER');
-const accountManagerHasFullAccess = computed(() => Boolean(currentUser.value?.full_load_access));
 
 const canCreateLoad = computed(() => isAdminLike.value || isAccountManager.value);
-const canBook = computed(() => isAdminLike.value || role.value === 'DISPATCHER');
+const canBook = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
 const canQuoteLoads = computed(() => canBook.value);
 const canQuoteGreenbush = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
 const canDecide = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
 const canUpdateStatus = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
 const canEditLoads = computed(() => isAdminLike.value || isAccountManager.value);
-const canManageCustomers = computed(() => isAdminLike.value || (isAccountManager.value && accountManagerHasFullAccess.value));
+const canManageCustomers = computed(() => isAdminLike.value || isAccountManager.value);
 const canManageUsers = computed(() => isAdminLike.value);
-const canManageGreenbush = computed(() => isAdminLike.value);
+const canManageGreenbush = computed(() => isAdminLike.value || isAccountManager.value);
 const canViewCustomersTab = computed(() => canManageCustomers.value);
 const canViewUsersTab = computed(() => canManageUsers.value);
 const canViewGreenbushTab = computed(() => canManageGreenbush.value);
 const canViewLoadChatTab = computed(() => isAdminLike.value || isAccountManager.value || role.value === 'DISPATCHER');
 const canViewReportsTab = computed(() => isAdminLike.value || isAccountManager.value);
+const canViewSettlementTab = computed(() => isAdminLike.value);
 const canViewAllLoadsTab = computed(() => isAdminLike.value || isAccountManager.value);
 const canViewMyLoadsTab = computed(() => role.value === 'DISPATCHER' || isAdminLike.value || isAccountManager.value);
 const canViewNewLoadTab = computed(() => canCreateLoad.value);
@@ -450,7 +464,7 @@ const navItems = computed(() => {
   const items: Array<{ id: TabId; label: string; icon: any; badge?: number }> = [];
 
   if (canViewNewLoadTab.value) {
-    items.push({ id: 'new-load', label: 'New Load', icon: Plus });
+    items.push({ id: 'new-load', label: 'New Loads', icon: Plus });
   }
   items.push({ id: 'available', label: 'Available', icon: Package });
   if (canViewMyLoadsTab.value) {
@@ -462,9 +476,6 @@ const navItems = computed(() => {
   if (canViewCustomersTab.value) {
     items.push({ id: 'customers', label: 'Customers', icon: Users });
   }
-  if (canViewUsersTab.value) {
-    items.push({ id: 'users', label: 'Settings', icon: Settings });
-  }
   if (canViewGreenbushTab.value) {
     items.push({ id: 'greenbush', label: 'Greenbush', icon: Leaf });
   }
@@ -473,6 +484,12 @@ const navItems = computed(() => {
   }
   if (canViewReportsTab.value) {
     items.push({ id: 'reports', label: 'Reports', icon: BarChart3 });
+  }
+  if (canViewSettlementTab.value) {
+    items.push({ id: 'settlement', label: 'Settlement', icon: List });
+  }
+  if (canViewUsersTab.value) {
+    items.push({ id: 'users', label: 'Settings', icon: Settings });
   }
 
   return items;

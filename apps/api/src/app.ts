@@ -35,11 +35,7 @@ function scopeLoadsByRole(
   }
 
   if (user.role === 'ACCOUNT_MANAGER') {
-    if (user.full_load_access) {
-      return loads;
-    }
-
-    return loads.filter((load) => load.account_manager_id === user.sub || load.status === 'AVAILABLE');
+    return loads;
   }
 
   if (user.role === 'DISPATCHER') {
@@ -96,15 +92,11 @@ export function createApp(repository: FreightRepository, options: CreateAppOptio
       ]);
 
       const normalizedRole = normalizeRole(currentUser.role);
-      const includeUsers = normalizedRole === 'ADMIN';
+      const includeUsers = normalizedRole === 'ADMIN' || currentUser.role === 'ACCOUNT_MANAGER';
       const users = includeUsers ? await repository.listUsers() : undefined;
 
       const loads = scopeLoadsByRole(currentUser, allLoads);
-      const customers =
-        normalizedRole === 'ADMIN' ||
-        (currentUser.role === 'ACCOUNT_MANAGER' && currentUser.full_load_access)
-          ? allCustomers
-          : [];
+      const customers = normalizedRole === 'ADMIN' || currentUser.role === 'ACCOUNT_MANAGER' ? allCustomers : [];
       const greenbush =
         normalizedRole === 'ADMIN' || currentUser.role === 'ACCOUNT_MANAGER' || currentUser.role === 'DISPATCHER'
           ? allGreenbush
