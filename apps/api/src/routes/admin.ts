@@ -8,17 +8,23 @@ import { requireRoles } from '../middleware/auth.js';
 import { assertCompanyDomain } from '../middleware/checkCompanyDomain.js';
 import { asyncHandler } from '../middleware/errors.js';
 
+const flexibleBoolean = z.preprocess((val) => {
+  if (typeof val === 'number') return val !== 0;
+  if (typeof val === 'string') return val.toLowerCase() === 'true' || val === '1';
+  return val;
+}, z.boolean());
+
 const customerSchema = z.object({
   name: z.string().trim().min(1),
   type: z.enum(['Direct Customer', 'Broker']),
-  quoteAccept: z.boolean().default(false),
+  quoteAccept: flexibleBoolean.default(false),
 });
 
 const userSchema = z.object({
   email: z.string().email(),
   name: z.string().trim().min(1),
   role: z.enum(USER_ROLES),
-  fullLoadAccess: z.boolean().optional(),
+  fullLoadAccess: flexibleBoolean.optional(),
 });
 
 const bulkRowsSchema = z.object({

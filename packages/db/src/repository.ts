@@ -149,6 +149,7 @@ export interface SettlementRecord {
   broker_load_count: number;
   direct_exception_load_count: number;
   direct_standard_load_count: number;
+  tier_basis_load_count: number | null;
   tier_applied: number;
   tier_rate: string;
   total_load_compensation: string;
@@ -218,6 +219,7 @@ export interface SettlementInsertInput {
   brokerLoadCount: number;
   directExceptionLoadCount: number;
   directStandardLoadCount: number;
+  tierBasisLoadCount?: number | null;
   tierApplied: number;
   tierRate: number;
   totalLoadCompensation: number;
@@ -1189,6 +1191,7 @@ export class FreightRepository {
             broker_load_count,
             direct_exception_load_count,
             direct_standard_load_count,
+            tier_basis_load_count,
             tier_applied,
             tier_rate,
             total_load_compensation,
@@ -1198,7 +1201,7 @@ export class FreightRepository {
             generated_by_user_id,
             tier_version
           ) values (
-            $1,$2,$3,$4,$5,'ACTIVE',null,null,null,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16,$17
+            $1,$2,$3,$4,$5,'ACTIVE',null,null,null,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17,$18
           )
           returning *`,
         sqlite: `insert into settlements (
@@ -1215,6 +1218,7 @@ export class FreightRepository {
             broker_load_count,
             direct_exception_load_count,
             direct_standard_load_count,
+            tier_basis_load_count,
             tier_applied,
             tier_rate,
             total_load_compensation,
@@ -1224,7 +1228,7 @@ export class FreightRepository {
             generated_by_user_id,
             tier_version
           ) values (
-            $1,$2,$3,$4,$5,'ACTIVE',null,null,null,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+            $1,$2,$3,$4,$5,'ACTIVE',null,null,null,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18
           )`,
       });
 
@@ -1239,6 +1243,7 @@ export class FreightRepository {
           input.brokerLoadCount,
           input.directExceptionLoadCount,
           input.directStandardLoadCount,
+          input.tierBasisLoadCount ?? null,
           input.tierApplied,
           input.tierRate,
           input.totalLoadCompensation,

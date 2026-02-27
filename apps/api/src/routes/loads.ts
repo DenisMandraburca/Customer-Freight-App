@@ -7,6 +7,12 @@ import { LOAD_STATUSES, type LoadStatus, type UserRole } from '@antigravity/shar
 import { requireRoles } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errors.js';
 
+const flexibleBoolean = z.preprocess((val) => {
+  if (typeof val === 'number') return val !== 0;
+  if (typeof val === 'string') return val.toLowerCase() === 'true' || val === '1';
+  return val;
+}, z.boolean());
+
 const loadStatusSchema = z.enum(LOAD_STATUSES);
 
 const createLoadSchema = z.object({
@@ -19,13 +25,13 @@ const createLoadSchema = z.object({
   puZip: z.string().trim().nullable().optional(),
   puDate: z.string().trim().nullable().optional(),
   puApptTime: z.string().trim().nullable().optional(),
-  puAppt: z.boolean().optional(),
+  puAppt: flexibleBoolean.optional(),
   delCity: z.string().trim().min(1),
   delState: z.string().trim().min(2).max(2),
   delZip: z.string().trim().nullable().optional(),
   delDate: z.string().trim().nullable().optional(),
   delApptTime: z.string().trim().nullable().optional(),
-  delAppt: z.boolean().optional(),
+  delAppt: flexibleBoolean.optional(),
   rate: z.number().finite().positive(),
   miles: z.number().finite().nonnegative(),
   notes: z.string().trim().nullable().optional(),
@@ -82,13 +88,13 @@ const updateLoadSchema = z.object({
   puZip: z.string().trim().nullable().optional(),
   puDate: z.string().trim().nullable().optional(),
   puApptTime: z.string().trim().nullable().optional(),
-  puAppt: z.boolean().optional(),
+  puAppt: flexibleBoolean.optional(),
   delCity: z.string().trim().optional(),
   delState: z.string().trim().optional(),
   delZip: z.string().trim().nullable().optional(),
   delDate: z.string().trim().nullable().optional(),
   delApptTime: z.string().trim().nullable().optional(),
-  delAppt: z.boolean().optional(),
+  delAppt: flexibleBoolean.optional(),
   rate: z.number().finite().positive().optional(),
   miles: z.number().finite().nonnegative().optional(),
   notes: z.string().trim().nullable().optional(),

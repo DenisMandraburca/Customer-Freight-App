@@ -83,8 +83,11 @@ export async function http<T>(input: RequestInfo | URL, init?: RequestInit): Pro
 
 export async function unwrap<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const envelope = await http<ApiEnvelope<T> | LegacyEnvelope<T>>(input, init);
+  if (envelope === undefined || envelope === null) {
+    return undefined as T;
+  }
 
-  if ('success' in envelope) {
+  if (typeof envelope === 'object' && 'success' in envelope) {
     return envelope.data;
   }
 
@@ -93,8 +96,14 @@ export async function unwrap<T>(input: RequestInfo | URL, init?: RequestInit): P
 
 export async function unwrapEnvelope<T>(input: RequestInfo | URL, init?: RequestInit): Promise<ApiEnvelope<T>> {
   const envelope = await http<ApiEnvelope<T> | LegacyEnvelope<T>>(input, init);
+  if (envelope === undefined || envelope === null) {
+    return {
+      success: true,
+      data: undefined as T,
+    };
+  }
 
-  if ('success' in envelope) {
+  if (typeof envelope === 'object' && 'success' in envelope) {
     return envelope;
   }
 

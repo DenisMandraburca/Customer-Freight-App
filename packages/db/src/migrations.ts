@@ -170,6 +170,7 @@ const sqliteSchemaSql = `
     broker_load_count integer not null default 0,
     direct_exception_load_count integer not null default 0,
     direct_standard_load_count integer not null default 0,
+    tier_basis_load_count integer,
     tier_applied integer not null,
     tier_rate numeric not null,
     total_load_compensation numeric not null,
@@ -275,6 +276,7 @@ function runSqliteSchemaSync(): void {
     ensureSqliteColumn(sqlite, 'users', 'default_flat_pay', 'numeric');
     ensureSqliteColumn(sqlite, 'users', 'exclude_from_payroll', 'integer not null default 0');
     ensureSqliteColumn(sqlite, 'settlement_tier_configs', 'broker_load_pay', 'numeric not null default 5.00');
+    ensureSqliteColumn(sqlite, 'settlements', 'tier_basis_load_count', 'integer');
   } finally {
     sqlite.close();
   }

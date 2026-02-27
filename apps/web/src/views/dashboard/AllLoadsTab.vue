@@ -830,13 +830,13 @@ function openEditModal(load: LoadRecord): void {
   editState.puState = load.pu_state ?? '';
   editState.puZip = load.pu_zip ?? '';
   editState.puDate = load.pu_date ?? '';
-  editState.puAppt = load.pu_appt;
+  editState.puAppt = Boolean(load.pu_appt);
   editState.puApptTime = load.pu_appt_time ?? '';
   editState.delCity = load.del_city ?? '';
   editState.delState = load.del_state ?? '';
   editState.delZip = load.del_zip ?? '';
   editState.delDate = load.del_date ?? '';
-  editState.delAppt = load.del_appt;
+  editState.delAppt = Boolean(load.del_appt);
   editState.delApptTime = load.del_appt_time ?? '';
   editState.rate = Number(load.rate);
   editState.miles = Number(load.miles);

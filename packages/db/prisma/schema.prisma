@@ -268,6 +268,7 @@ model Settlement {
   brokerLoadCount          Int                          @default(0) @map("broker_load_count")
   directExceptionLoadCount Int                          @default(0) @map("direct_exception_load_count")
   directStandardLoadCount  Int                          @default(0) @map("direct_standard_load_count")
+  tierBasisLoadCount       Int?                         @map("tier_basis_load_count")
   tierApplied              Int                          @map("tier_applied")
   tierRate                 Decimal                      @map("tier_rate") @db.Decimal(12, 2)
   totalLoadCompensation    Decimal                      @map("total_load_compensation") @db.Decimal(12, 2)

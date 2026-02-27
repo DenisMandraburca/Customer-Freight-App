@@ -167,6 +167,7 @@ export interface SettlementRecord {
     brokerLoadCount: number;
     directExceptionLoadCount: number;
     directStandardLoadCount: number;
+    tierBasisLoadCount: number | null;
     tierApplied: number;
     tierRate: number;
     totalLoadCompensation: number;

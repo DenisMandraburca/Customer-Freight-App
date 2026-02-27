@@ -261,7 +261,7 @@ function startEdit(customer: CustomerRecord): void {
   editingCustomer.value = customer;
   form.name = customer.name;
   form.type = customer.type;
-  form.quoteAccept = customer.quote_accept;
+  form.quoteAccept = Boolean(customer.quote_accept);
 }
 
 function cancelEdit(): void {

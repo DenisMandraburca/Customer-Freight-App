@@ -480,7 +480,7 @@ function startEdit(user: UserRecord): void {
   form.name = user.name;
   form.email = user.email;
   form.role = user.role;
-  form.fullLoadAccess = user.full_load_access;
+  form.fullLoadAccess = Boolean(user.full_load_access);
 }
 
 function cancelEdit(): void {

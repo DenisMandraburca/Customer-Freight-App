@@ -1399,10 +1399,101 @@ integration('API integration', () => {
     expect(generateResponse.body.data.summary.brokerLoadCount).toBe(1);
     expect(generateResponse.body.data.summary.directExceptionLoadCount).toBe(1);
     expect(generateResponse.body.data.summary.directStandardLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.tierBasisLoadCount).toBe(3);
     expect(generateResponse.body.data.summary.totalLoadCompensation).toBe(20);
     expect(generateResponse.body.data.summary.totalSettlementAmount).toBe(1020);
     expect(generateResponse.body.data.excludedTonuLoads).toHaveLength(1);
     expect(generateResponse.body.data.excludedTonuLoads[0].loadRefNumber).toBe('SETTLE-TONU-LOW');
+  });
+
+  it('settlements: tier basis uses all payable loads and applies tier only to standard direct loads', async () => {
+    const brokerCustomer = await ctx.repository.createCustomer({
+      name: 'Basis Broker',
+      type: 'Broker',
+      quoteAccept: false,
+    });
+    const directExceptionCustomer = await ctx.repository.createCustomer({
+      name: 'Basis Direct Exception',
+      type: 'Direct Customer',
+      quoteAccept: false,
+    });
+
+    await ctx.request
+      .patch(`/api/customer-freight/settlements/users/${ctx.users.accountManager.id}/default-flat-pay`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ defaultFlatPay: 1000 });
+
+    await ctx.request
+      .patch('/api/customer-freight/settlements/config/tier')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        brokerLoadPay: 5,
+        tier1MaxLoad: 1,
+        tier1Rate: 10,
+        tier2MaxLoad: 2,
+        tier2Rate: 10.5,
+        tier3Rate: 11,
+      });
+
+    await ctx.request
+      .put('/api/customer-freight/settlements/config/direct-exceptions')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ customerIds: [directExceptionCustomer.id] });
+
+    const createLoad = async (
+      customerId: string,
+      ref: string,
+      puDate: string,
+      delDate: string,
+      rate: number,
+      miles: number,
+    ): Promise<string> => {
+      const response = await ctx.request
+        .post('/api/customer-freight/loads')
+        .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+        .send({
+          customerId,
+          accountManagerId: ctx.users.accountManager.id,
+          loadRefNumber: ref,
+          puCity: 'Chicago',
+          puState: 'IL',
+          puDate,
+          delCity: 'Dallas',
+          delState: 'TX',
+          delDate,
+          rate,
+          miles,
+        });
+      expect(response.status).toBe(201);
+      return response.body.data.id as string;
+    };
+
+    await createLoad(brokerCustomer.id, 'SETTLE-BASIS-BROKER-1', '2026-08-10', '2026-08-12', 1500, 700);
+    await createLoad(directExceptionCustomer.id, 'SETTLE-BASIS-EXC-1', '2026-08-11', '2026-08-13', 1200, 500);
+    await createLoad(ctx.customer.id, 'SETTLE-BASIS-STD-1', '2026-08-12', '2026-08-14', 1100, 400);
+
+    const generateResponse = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 8,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+
+    expect(generateResponse.status).toBe(201);
+    expect(generateResponse.body.data.summary.brokerLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.directExceptionLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.directStandardLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.tierBasisLoadCount).toBe(3);
+    expect(generateResponse.body.data.summary.tierApplied).toBe(3);
+    expect(generateResponse.body.data.summary.tierRate).toBe(11);
+    expect(generateResponse.body.data.summary.totalLoadCompensation).toBe(21);
+    expect(generateResponse.body.data.summary.totalSettlementAmount).toBe(1021);
+    expect(generateResponse.body.data.brokerLoads[0].compensationAmount).toBe(5);
+    expect(generateResponse.body.data.directExceptionLoads[0].compensationAmount).toBe(5);
+    expect(generateResponse.body.data.directStandardLoads[0].compensationAmount).toBe(11);
   });
 
   it('settlements: duplicate generation blocks unless override=true', async () => {
@@ -1506,6 +1597,7 @@ integration('API integration', () => {
         calculationMethod: 'PU',
       });
     expect(january.status).toBe(201);
+    expect(january.body.data.summary.tierBasisLoadCount).toBe(1);
     expect(january.body.data.summary.totalLoadCompensation).toBe(10);
 
     const february = await ctx.request
@@ -1520,8 +1612,66 @@ integration('API integration', () => {
     expect(february.status).toBe(201);
     expect(february.body.data.crossMonthLoads).toHaveLength(1);
     expect(february.body.data.crossMonthLoads[0].loadRefNumber).toBe('SETTLE-CROSS-1');
+    expect(february.body.data.summary.tierBasisLoadCount).toBe(0);
     expect(february.body.data.summary.totalLoadCompensation).toBe(0);
     expect(february.body.data.summary.totalSettlementAmount).toBe(800);
+  });
+
+  it('settlements: legacy records expose null tierBasisLoadCount', async () => {
+    await ctx.request
+      .patch(`/api/customer-freight/settlements/users/${ctx.users.accountManager.id}/default-flat-pay`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ defaultFlatPay: 700 });
+
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        loadRefNumber: 'SETTLE-LEGACY-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        puDate: '2026-09-10',
+        delCity: 'Dallas',
+        delState: 'TX',
+        delDate: '2026-09-12',
+        rate: 1000,
+        miles: 500,
+      });
+    expect(loadResponse.status).toBe(201);
+
+    const generateResponse = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 9,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+    expect(generateResponse.status).toBe(201);
+    const settlementId = generateResponse.body.data.id as string;
+
+    const repositoryWithDb = ctx.repository as unknown as {
+      db: { query: (sql: string, params?: unknown[]) => Promise<void> };
+    };
+    await repositoryWithDb.db.query(`update settlements set tier_basis_load_count = null where id = $1`, [settlementId]);
+
+    const detail = await ctx.request
+      .get(`/api/customer-freight/settlements/${settlementId}`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.summary.tierBasisLoadCount).toBeNull();
+
+    const history = await ctx.request
+      .get('/api/customer-freight/settlements?limit=100')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(history.status).toBe(200);
+    const found = (history.body.data as Array<{ id: string; summary: { tierBasisLoadCount: number | null } }>).find(
+      (row) => row.id === settlementId,
+    );
+    expect(found?.summary.tierBasisLoadCount).toBeNull();
   });
 
   it('settlements: PDF export returns a PDF payload', async () => {
@@ -1564,6 +1714,9 @@ integration('API integration', () => {
       .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
     expect(pdfResponse.status).toBe(200);
     expect(pdfResponse.headers['content-type']).toContain('application/pdf');
+    expect(pdfResponse.headers['content-disposition']).toContain(
+      'attachment; filename="Statement May 2026 - Account Manager User.pdf"',
+    );
     const bodyLength = Buffer.isBuffer(pdfResponse.body)
       ? pdfResponse.body.length
       : typeof pdfResponse.text === 'string'
