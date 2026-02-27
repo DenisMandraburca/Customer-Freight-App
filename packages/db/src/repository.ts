@@ -24,6 +24,8 @@ export interface UserRecord {
   name: string;
   role: UserRole;
   full_load_access: boolean;
+  default_flat_pay: string | null;
+  exclude_from_payroll: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -95,6 +97,152 @@ export interface LoadRecord {
   customer_quote_accept: boolean | null;
   account_manager_name: string | null;
   dispatcher_name: string | null;
+}
+
+export const SETTLEMENT_CALCULATION_METHODS = ['PU', 'DELIVERY'] as const;
+export type SettlementCalculationMethod = (typeof SETTLEMENT_CALCULATION_METHODS)[number];
+
+export const SETTLEMENT_STATUSES = ['ACTIVE', 'OVERRIDDEN'] as const;
+export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
+
+export const SETTLEMENT_LOAD_ENTRY_TYPES = [
+  'BROKER',
+  'DIRECT_EXCEPTION',
+  'DIRECT_STANDARD',
+  'EXCLUDED_TONU',
+  'CROSS_MONTH',
+] as const;
+export type SettlementLoadEntryType = (typeof SETTLEMENT_LOAD_ENTRY_TYPES)[number];
+
+export interface SettlementTierConfigRecord {
+  id: string;
+  version: number;
+  is_active: boolean;
+  broker_load_pay: string;
+  tier1_max_load: number;
+  tier1_rate: string;
+  tier2_max_load: number;
+  tier2_rate: string;
+  tier3_rate: string;
+  created_by_user_id: string | null;
+  created_at: string;
+}
+
+export interface SettlementDirectCustomerExceptionRecord {
+  id: string;
+  customer_id: string;
+  created_by_user_id: string | null;
+  created_at: string;
+}
+
+export interface SettlementRecord {
+  id: string;
+  user_id: string;
+  month: number;
+  year: number;
+  calculation_method: SettlementCalculationMethod;
+  status: SettlementStatus;
+  overridden_at: string | null;
+  overridden_by_user_id: string | null;
+  superseded_by_settlement_id: string | null;
+  default_flat_pay: string;
+  broker_load_count: number;
+  direct_exception_load_count: number;
+  direct_standard_load_count: number;
+  tier_applied: number;
+  tier_rate: string;
+  total_load_compensation: string;
+  total_settlement_amount: string;
+  excluded_loads_json: string;
+  cross_month_loads_json: string;
+  generated_by_user_id: string;
+  tier_version: number;
+  created_at: string;
+}
+
+export interface SettlementLoadEntryRecord {
+  id: string;
+  settlement_id: string;
+  user_id: string;
+  load_id: string | null;
+  entry_type: SettlementLoadEntryType;
+  compensation_amount: string;
+  customer_type_snapshot: string | null;
+  status_snapshot: LoadStatus | null;
+  revenue_snapshot: string;
+  pu_date_snapshot: string | null;
+  del_date_snapshot: string | null;
+  load_ref_number_snapshot: string | null;
+  mcleod_order_id_snapshot: string | null;
+  customer_name_snapshot: string | null;
+  previous_settlement_id: string | null;
+  previous_settlement_month: number | null;
+  previous_settlement_year: number | null;
+  created_at: string;
+}
+
+export interface SettlementLoadPaidHistoryRecord {
+  load_id: string;
+  settlement_id: string;
+  month: number;
+  year: number;
+}
+
+export interface SettlementDetailRecord extends SettlementRecord {
+  user_name: string | null;
+  generated_by_name: string | null;
+  entries: SettlementLoadEntryRecord[];
+}
+
+export interface SettlementSummaryRecord extends SettlementRecord {
+  user_name: string | null;
+  generated_by_name: string | null;
+}
+
+export interface SettlementTierMutationInput {
+  brokerLoadPay: number;
+  tier1MaxLoad: number;
+  tier1Rate: number;
+  tier2MaxLoad: number;
+  tier2Rate: number;
+  tier3Rate: number;
+  createdByUserId: string;
+}
+
+export interface SettlementInsertInput {
+  userId: string;
+  month: number;
+  year: number;
+  calculationMethod: SettlementCalculationMethod;
+  defaultFlatPay: number;
+  brokerLoadCount: number;
+  directExceptionLoadCount: number;
+  directStandardLoadCount: number;
+  tierApplied: number;
+  tierRate: number;
+  totalLoadCompensation: number;
+  totalSettlementAmount: number;
+  excludedLoadsJson: unknown;
+  crossMonthLoadsJson: unknown;
+  generatedByUserId: string;
+  tierVersion: number;
+  overrideSettlementId?: string;
+  entries: Array<{
+    loadId?: string | null;
+    entryType: SettlementLoadEntryType;
+    compensationAmount: number;
+    customerTypeSnapshot?: string | null;
+    statusSnapshot?: LoadStatus | null;
+    revenueSnapshot: number;
+    puDateSnapshot?: string | null;
+    delDateSnapshot?: string | null;
+    loadRefNumberSnapshot?: string | null;
+    mcleodOrderIdSnapshot?: string | null;
+    customerNameSnapshot?: string | null;
+    previousSettlementId?: string | null;
+    previousSettlementMonth?: number | null;
+    previousSettlementYear?: number | null;
+  }>;
 }
 
 export const CHAT_MESSAGE_TYPES = ['MANUAL', 'SYSTEM'] as const;
@@ -370,6 +518,38 @@ function toBoolean(value: unknown): boolean {
   return false;
 }
 
+function parseMonthYearFromDateText(value: string | null | undefined): { month: number; year: number } | null {
+  if (!value) {
+    return null;
+  }
+
+  const raw = value.trim();
+  if (!raw) {
+    return null;
+  }
+
+  const isoLike = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (isoLike) {
+    const year = Number(isoLike[1]);
+    const month = Number(isoLike[2]);
+    if (Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12) {
+      return { month, year };
+    }
+    return null;
+  }
+
+  const slashDate = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    const month = Number(slashDate[1]);
+    const year = Number(slashDate[3]);
+    if (Number.isInteger(year) && Number.isInteger(month) && month >= 1 && month <= 12) {
+      return { month, year };
+    }
+  }
+
+  return null;
+}
+
 function buildChatOrderMeta(load: Pick<LoadRecord, 'id' | 'load_ref_number' | 'mcleod_order_id'>): {
   type: ChatOrderKeyType;
   value: string;
@@ -605,6 +785,508 @@ export class FreightRepository {
 
   async listUsers(): Promise<UserRecord[]> {
     const result = await this.db.query<UserRecord>(`select * from users order by created_at desc`);
+    return result.rows;
+  }
+
+  async updateUserDefaultFlatPay(
+    userId: string,
+    defaultFlatPay: number | null,
+    excludeFromPayroll?: boolean,
+  ): Promise<UserRecord> {
+    if (defaultFlatPay !== null && (!Number.isFinite(defaultFlatPay) || defaultFlatPay < 0)) {
+      throw new HttpError('defaultFlatPay must be a non-negative number or null.', 400, 'VALIDATION_ERROR');
+    }
+    if (excludeFromPayroll !== undefined && typeof excludeFromPayroll !== 'boolean') {
+      throw new HttpError('excludeFromPayroll must be a boolean when provided.', 400, 'VALIDATION_ERROR');
+    }
+
+    const sql = sqlByDialect(this.dialect, {
+      postgres: `update users
+        set default_flat_pay = $2,
+            exclude_from_payroll = coalesce($3, exclude_from_payroll)
+        where id = $1
+        returning *`,
+      sqlite: `update users
+        set default_flat_pay = $2,
+            exclude_from_payroll = coalesce($3, exclude_from_payroll)
+        where id = $1`,
+    });
+    const result = await this.db.query<UserRecord>(sql, [
+      userId,
+      defaultFlatPay,
+      excludeFromPayroll === undefined ? null : excludeFromPayroll,
+    ]);
+
+    if (result.rowCount === 0) {
+      throw new HttpError('User not found.', 404, 'NOT_FOUND');
+    }
+
+    if (this.dialect === 'sqlite') {
+      const refreshed = await this.getUserById(userId);
+      if (!refreshed) {
+        throw new HttpError('User not found.', 404, 'NOT_FOUND');
+      }
+      return refreshed;
+    }
+
+    return result.rows[0]!;
+  }
+
+  async getActiveSettlementTierConfig(): Promise<SettlementTierConfigRecord | null> {
+    const activePredicate = this.dialect === 'sqlite' ? 'is_active = 1' : 'is_active = true';
+    const result = await this.db.query<SettlementTierConfigRecord>(
+      `select *
+       from settlement_tier_configs
+       where ${activePredicate}
+       order by version desc
+       limit 1`,
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async listSettlementDirectCustomerExceptions(): Promise<SettlementDirectCustomerExceptionRecord[]> {
+    const result = await this.db.query<SettlementDirectCustomerExceptionRecord>(
+      `select *
+       from settlement_direct_customer_exceptions
+       order by created_at asc, id asc`,
+    );
+    return result.rows;
+  }
+
+  async replaceSettlementDirectCustomerExceptions(
+    customerIds: string[],
+    createdByUserId: string,
+  ): Promise<SettlementDirectCustomerExceptionRecord[]> {
+    const uniqueCustomerIds = [...new Set(customerIds.map((id) => id.trim()).filter(Boolean))];
+
+    return this.db.withTransaction(async (tx) => {
+      await tx.query(`delete from settlement_direct_customer_exceptions`);
+
+      for (const customerId of uniqueCustomerIds) {
+        await tx.query(
+          `insert into settlement_direct_customer_exceptions (id, customer_id, created_by_user_id)
+           values ($1, $2, $3)`,
+          [randomUUID(), customerId, createdByUserId],
+        );
+      }
+
+      const refreshed = await tx.query<SettlementDirectCustomerExceptionRecord>(
+        `select *
+         from settlement_direct_customer_exceptions
+         order by created_at asc, id asc`,
+      );
+      return refreshed.rows;
+    });
+  }
+
+  async createSettlementTierConfig(payload: SettlementTierMutationInput): Promise<SettlementTierConfigRecord> {
+    if (!Number.isInteger(payload.tier1MaxLoad) || payload.tier1MaxLoad < 0) {
+      throw new HttpError('tier1MaxLoad must be an integer >= 0.', 400, 'VALIDATION_ERROR');
+    }
+    if (!Number.isInteger(payload.tier2MaxLoad) || payload.tier2MaxLoad <= payload.tier1MaxLoad) {
+      throw new HttpError('tier2MaxLoad must be greater than tier1MaxLoad.', 400, 'VALIDATION_ERROR');
+    }
+
+    const moneyFields: Array<[number, string]> = [
+      [payload.brokerLoadPay, 'brokerLoadPay'],
+      [payload.tier1Rate, 'tier1Rate'],
+      [payload.tier2Rate, 'tier2Rate'],
+      [payload.tier3Rate, 'tier3Rate'],
+    ];
+    for (const [value, field] of moneyFields) {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new HttpError(`${field} must be a non-negative number.`, 400, 'VALIDATION_ERROR');
+      }
+    }
+
+    return this.db.withTransaction(async (tx) => {
+      const versionResult = await tx.query<{ next_version: number | string }>(
+        `select coalesce(max(version), 0) + 1 as next_version
+         from settlement_tier_configs`,
+      );
+      const version = Number(versionResult.rows[0]?.next_version ?? 1);
+
+      const deactivateSql = sqlByDialect(this.dialect, {
+        postgres: `update settlement_tier_configs set is_active = false where is_active = true`,
+        sqlite: `update settlement_tier_configs set is_active = 0 where is_active = 1`,
+      });
+      await tx.query(deactivateSql);
+
+      const id = randomUUID();
+      const insertSql = sqlByDialect(this.dialect, {
+        postgres: `insert into settlement_tier_configs (
+            id,
+            version,
+            is_active,
+            broker_load_pay,
+            tier1_max_load,
+            tier1_rate,
+            tier2_max_load,
+            tier2_rate,
+            tier3_rate,
+            created_by_user_id
+          ) values ($1,$2,true,$3,$4,$5,$6,$7,$8,$9)
+          returning *`,
+        sqlite: `insert into settlement_tier_configs (
+            id,
+            version,
+            is_active,
+            broker_load_pay,
+            tier1_max_load,
+            tier1_rate,
+            tier2_max_load,
+            tier2_rate,
+            tier3_rate,
+            created_by_user_id
+          ) values ($1,$2,1,$3,$4,$5,$6,$7,$8,$9)`,
+      });
+      const result = await tx.query<SettlementTierConfigRecord>(insertSql, [
+        id,
+        version,
+        payload.brokerLoadPay,
+        payload.tier1MaxLoad,
+        payload.tier1Rate,
+        payload.tier2MaxLoad,
+        payload.tier2Rate,
+        payload.tier3Rate,
+        payload.createdByUserId,
+      ]);
+
+      if (this.dialect === 'sqlite') {
+        const refreshed = await tx.query<SettlementTierConfigRecord>(
+          `select *
+           from settlement_tier_configs
+           where id = $1
+           limit 1`,
+          [id],
+        );
+        if (refreshed.rowCount === 0) {
+          throw new HttpError('Tier config creation failed.', 500, 'INTERNAL_ERROR');
+        }
+        return refreshed.rows[0]!;
+      }
+
+      return result.rows[0]!;
+    });
+  }
+
+  async ensureDefaultSettlementTierConfig(): Promise<void> {
+    const existing = await this.getActiveSettlementTierConfig();
+    if (existing) {
+      return;
+    }
+
+    await this.db.query(
+      sqlByDialect(this.dialect, {
+        postgres: `insert into settlement_tier_configs (
+            id,
+            version,
+            is_active,
+            broker_load_pay,
+            tier1_max_load,
+            tier1_rate,
+            tier2_max_load,
+            tier2_rate,
+            tier3_rate,
+            created_by_user_id
+          ) values ($1, 1, true, 5.00, 200, 10.00, 300, 10.50, 11.00, null)`,
+        sqlite: `insert into settlement_tier_configs (
+            id,
+            version,
+            is_active,
+            broker_load_pay,
+            tier1_max_load,
+            tier1_rate,
+            tier2_max_load,
+            tier2_rate,
+            tier3_rate,
+            created_by_user_id
+          ) values ($1, 1, 1, 5.00, 200, 10.00, 300, 10.50, 11.00, null)`,
+      }),
+      [randomUUID()],
+    );
+  }
+
+  async listLoadsForSettlementWindow(
+    userId: string,
+    month: number,
+    year: number,
+    calculationMethod: SettlementCalculationMethod,
+  ): Promise<LoadRecord[]> {
+    const dateColumn = calculationMethod === 'DELIVERY' ? 'l.del_date' : 'l.pu_date';
+    const orderBy = sqlByDialect(this.dialect, {
+      postgres: `${dateColumn} asc nulls last, l.created_at asc`,
+      sqlite: `${dateColumn} asc, l.created_at asc`,
+    });
+
+    if (this.dialect === 'sqlite') {
+      const result = await this.db.query<LoadRecord>(
+        `${this.loadSelectSql}
+         where l.account_manager_id = $1
+           and ${dateColumn} is not null
+         order by ${orderBy}`,
+        [userId],
+      );
+
+      return result.rows.filter((load) => {
+        const dateText = calculationMethod === 'DELIVERY' ? load.del_date : load.pu_date;
+        const parsed = parseMonthYearFromDateText(dateText);
+        return parsed?.month === month && parsed.year === year;
+      });
+    }
+
+    const result = await this.db.query<LoadRecord>(
+      `${this.loadSelectSql}
+       where l.account_manager_id = $1
+         and ${dateColumn} is not null
+         and extract(month from ${dateColumn}) = $2
+         and extract(year from ${dateColumn}) = $3
+       order by ${orderBy}`,
+      [userId, month, year],
+    );
+    return result.rows;
+  }
+
+  async findActiveSettlementByKey(
+    userId: string,
+    month: number,
+    year: number,
+    calculationMethod: SettlementCalculationMethod,
+  ): Promise<SettlementRecord | null> {
+    const result = await this.db.query<SettlementRecord>(
+      `select *
+       from settlements
+       where user_id = $1
+         and month = $2
+         and year = $3
+         and calculation_method = $4
+         and status = 'ACTIVE'
+       order by created_at desc
+       limit 1`,
+      [userId, month, year, calculationMethod],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async listActivePaidSettlementLoadHistory(
+    userId: string,
+    options?: { excludeSettlementId?: string },
+  ): Promise<SettlementLoadPaidHistoryRecord[]> {
+    const params: unknown[] = [userId];
+    let excludeClause = '';
+    if (options?.excludeSettlementId) {
+      params.push(options.excludeSettlementId);
+      excludeClause = `and s.id <> $${params.length}`;
+    }
+
+    const rows = await this.db.query<{
+      load_id: string | null;
+      settlement_id: string;
+      month: number | string;
+      year: number | string;
+      created_at: unknown;
+    }>(
+      `select
+         e.load_id,
+         s.id as settlement_id,
+         s.month,
+         s.year,
+         s.created_at
+       from settlement_load_entries e
+       join settlements s on s.id = e.settlement_id
+       where s.user_id = $1
+         and s.status = 'ACTIVE'
+         and e.entry_type in ('BROKER', 'DIRECT_EXCEPTION', 'DIRECT_STANDARD')
+         and e.compensation_amount > 0
+         and e.load_id is not null
+         ${excludeClause}
+       order by s.created_at desc`,
+      params,
+    );
+
+    const seenLoadIds = new Set<string>();
+    const history: SettlementLoadPaidHistoryRecord[] = [];
+    for (const row of rows.rows) {
+      const loadId = row.load_id?.trim();
+      if (!loadId || seenLoadIds.has(loadId)) {
+        continue;
+      }
+      seenLoadIds.add(loadId);
+      history.push({
+        load_id: loadId,
+        settlement_id: row.settlement_id,
+        month: Number(row.month),
+        year: Number(row.year),
+      });
+    }
+
+    return history;
+  }
+
+  async createSettlementWithEntries(input: SettlementInsertInput): Promise<SettlementDetailRecord> {
+    return this.db.withTransaction(async (tx) => {
+      const settlementId = randomUUID();
+      const insertSql = sqlByDialect(this.dialect, {
+        postgres: `insert into settlements (
+            id,
+            user_id,
+            month,
+            year,
+            calculation_method,
+            status,
+            overridden_at,
+            overridden_by_user_id,
+            superseded_by_settlement_id,
+            default_flat_pay,
+            broker_load_count,
+            direct_exception_load_count,
+            direct_standard_load_count,
+            tier_applied,
+            tier_rate,
+            total_load_compensation,
+            total_settlement_amount,
+            excluded_loads_json,
+            cross_month_loads_json,
+            generated_by_user_id,
+            tier_version
+          ) values (
+            $1,$2,$3,$4,$5,'ACTIVE',null,null,null,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16,$17
+          )
+          returning *`,
+        sqlite: `insert into settlements (
+            id,
+            user_id,
+            month,
+            year,
+            calculation_method,
+            status,
+            overridden_at,
+            overridden_by_user_id,
+            superseded_by_settlement_id,
+            default_flat_pay,
+            broker_load_count,
+            direct_exception_load_count,
+            direct_standard_load_count,
+            tier_applied,
+            tier_rate,
+            total_load_compensation,
+            total_settlement_amount,
+            excluded_loads_json,
+            cross_month_loads_json,
+            generated_by_user_id,
+            tier_version
+          ) values (
+            $1,$2,$3,$4,$5,'ACTIVE',null,null,null,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+          )`,
+      });
+
+      await tx.query<SettlementRecord>(insertSql, [
+        settlementId,
+        input.userId,
+        input.month,
+        input.year,
+        input.calculationMethod,
+        input.defaultFlatPay,
+        input.brokerLoadCount,
+        input.directExceptionLoadCount,
+        input.directStandardLoadCount,
+        input.tierApplied,
+        input.tierRate,
+        input.totalLoadCompensation,
+        input.totalSettlementAmount,
+        JSON.stringify(input.excludedLoadsJson ?? []),
+        JSON.stringify(input.crossMonthLoadsJson ?? []),
+        input.generatedByUserId,
+        input.tierVersion,
+      ]);
+
+      for (const entry of input.entries) {
+        await tx.query(
+          `insert into settlement_load_entries (
+              id,
+              settlement_id,
+              user_id,
+              load_id,
+              entry_type,
+              compensation_amount,
+              customer_type_snapshot,
+              status_snapshot,
+              revenue_snapshot,
+              pu_date_snapshot,
+              del_date_snapshot,
+              load_ref_number_snapshot,
+              mcleod_order_id_snapshot,
+              customer_name_snapshot,
+              previous_settlement_id,
+              previous_settlement_month,
+              previous_settlement_year
+            ) values (
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+            )`,
+          [
+            randomUUID(),
+            settlementId,
+            input.userId,
+            entry.loadId ?? null,
+            entry.entryType,
+            entry.compensationAmount,
+            entry.customerTypeSnapshot ?? null,
+            entry.statusSnapshot ?? null,
+            entry.revenueSnapshot,
+            entry.puDateSnapshot ?? null,
+            entry.delDateSnapshot ?? null,
+            entry.loadRefNumberSnapshot ?? null,
+            entry.mcleodOrderIdSnapshot ?? null,
+            entry.customerNameSnapshot ?? null,
+            entry.previousSettlementId ?? null,
+            entry.previousSettlementMonth ?? null,
+            entry.previousSettlementYear ?? null,
+          ],
+        );
+      }
+
+      if (input.overrideSettlementId) {
+        const updateResult = await tx.query(
+          `update settlements
+           set status = 'OVERRIDDEN',
+               overridden_at = $3,
+               overridden_by_user_id = $4,
+               superseded_by_settlement_id = $2
+           where id = $1
+             and status = 'ACTIVE'`,
+          [input.overrideSettlementId, settlementId, new Date().toISOString(), input.generatedByUserId],
+        );
+        if (updateResult.rowCount === 0) {
+          throw new HttpError('Active settlement for override was not found.', 409, 'SETTLEMENT_EXISTS');
+        }
+      }
+
+      const detail = await this.getSettlementDetailByIdWithExecutor(tx, settlementId);
+      if (!detail) {
+        throw new HttpError('Settlement creation failed.', 500, 'INTERNAL_ERROR');
+      }
+      return detail;
+    });
+  }
+
+  async getSettlementDetailById(settlementId: string): Promise<SettlementDetailRecord | null> {
+    return this.getSettlementDetailByIdWithExecutor(this.db, settlementId);
+  }
+
+  async listSettlementSummaries(limit: number): Promise<SettlementSummaryRecord[]> {
+    const safeLimit = Number.isInteger(limit) ? Math.min(Math.max(limit, 1), 500) : 100;
+    const result = await this.db.query<SettlementSummaryRecord>(
+      `select
+         s.*,
+         u.name as user_name,
+         gu.name as generated_by_name
+       from settlements s
+       left join users u on u.id = s.user_id
+       left join users gu on gu.id = s.generated_by_user_id
+       order by s.created_at desc, s.id desc
+       limit $1`,
+      [safeLimit],
+    );
     return result.rows;
   }
 
@@ -2327,6 +3009,65 @@ export class FreightRepository {
     return refreshed;
   }
 
+  private async getSettlementDetailByIdWithExecutor(
+    executor: QueryExecutor,
+    settlementId: string,
+  ): Promise<SettlementDetailRecord | null> {
+    const settlementRow = await executor.query<
+      SettlementRecord & {
+        user_name: string | null;
+        generated_by_name: string | null;
+      }
+    >(
+      `select
+         s.*,
+         u.name as user_name,
+         gu.name as generated_by_name
+       from settlements s
+       left join users u on u.id = s.user_id
+       left join users gu on gu.id = s.generated_by_user_id
+       where s.id = $1
+       limit 1`,
+      [settlementId],
+    );
+
+    if (settlementRow.rowCount === 0) {
+      return null;
+    }
+
+    const entriesRow = await executor.query<SettlementLoadEntryRecord>(
+      `select
+         id,
+         settlement_id,
+         user_id,
+         load_id,
+         entry_type,
+         compensation_amount,
+         customer_type_snapshot,
+         status_snapshot,
+         revenue_snapshot,
+         pu_date_snapshot,
+         del_date_snapshot,
+         load_ref_number_snapshot,
+         mcleod_order_id_snapshot,
+         customer_name_snapshot,
+         previous_settlement_id,
+         previous_settlement_month,
+         previous_settlement_year,
+         created_at
+       from settlement_load_entries
+       where settlement_id = $1
+       order by created_at asc, id asc`,
+      [settlementId],
+    );
+
+    const row = settlementRow.rows[0]!;
+    return {
+      ...row,
+      entries: entriesRow.rows,
+    };
+  }
+
   async deleteLoad(loadId: string): Promise<void> {
     // Idempotent delete: deleting an already-removed load is treated as success.
     await this.db.query(`delete from loads where id = $1`, [loadId]);
@@ -2346,5 +3087,6 @@ export class FreightRepository {
     await this.db.withTransaction(async (tx) => {
       await ensureGreenbushCustomer(tx, this.dialect);
     });
+    await this.ensureDefaultSettlementTierConfig();
   }
 }

@@ -32,12 +32,38 @@ enum LoadStatus {
   @@map("load_status")
 }
 
+enum SettlementCalculationMethod {
+  PU
+  DELIVERY
+
+  @@map("settlement_calculation_method")
+}
+
+enum SettlementStatus {
+  ACTIVE
+  OVERRIDDEN
+
+  @@map("settlement_status")
+}
+
+enum SettlementLoadEntryType {
+  BROKER
+  DIRECT_EXCEPTION
+  DIRECT_STANDARD
+  EXCLUDED_TONU
+  CROSS_MONTH
+
+  @@map("settlement_load_entry_type")
+}
+
 model User {
   id             String   @id
   email          String   @unique
   name           String
   role           UserRole @default(DISPATCHER)
   fullLoadAccess Boolean  @default(false) @map("full_load_access")
+  defaultFlatPay Decimal? @map("default_flat_pay")
+  excludeFromPayroll Boolean @default(false) @map("exclude_from_payroll")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @default(now()) @map("updated_at")
 
@@ -46,6 +72,12 @@ model User {
   sentChatMessages    LoadChatMessage[] @relation("LoadChatSender")
   targetedChatMessages LoadChatMessage[] @relation("LoadChatTargetUser")
   chatReadStates       LoadChatRead[]
+  settlementTierConfigs SettlementTierConfig[] @relation("SettlementTierCreatedBy")
+  settlementExceptions  SettlementDirectCustomerException[] @relation("SettlementDirectExceptionCreatedBy")
+  settlementsGenerated  Settlement[] @relation("SettlementGeneratedBy")
+  settlementsForUser    Settlement[] @relation("SettlementUser")
+  settlementsOverridden Settlement[] @relation("SettlementOverriddenBy")
+  settlementLoadEntries SettlementLoadEntry[]
 
   @@map("users")
 }
@@ -59,6 +91,7 @@ model Customer {
   updatedAt   DateTime  @default(now()) @map("updated_at")
 
   loads       Load[]
+  settlementException SettlementDirectCustomerException?
 
   @@map("customers")
 }
@@ -127,6 +160,7 @@ model Load {
   chatSettings         LoadChatSetting?
   chatRetention        LoadChatRetention?
   chatReadStates       LoadChatRead[]
+  settlementEntries    SettlementLoadEntry[]
 
   @@index([status], map: "idx_loads_status")
   @@index([assignedDispatcherId], map: "idx_loads_dispatcher")
@@ -186,4 +220,105 @@ model LoadChatRead {
   @@id([userId, loadId])
   @@index([loadId, userId], map: "idx_load_chat_reads_load_user")
   @@map("load_chat_reads")
+}
+
+model SettlementTierConfig {
+  id              String   @id
+  version         Int      @unique
+  isActive        Boolean  @default(false) @map("is_active")
+  brokerLoadPay   Decimal  @map("broker_load_pay")
+  tier1MaxLoad    Int      @map("tier1_max_load")
+  tier1Rate       Decimal  @map("tier1_rate")
+  tier2MaxLoad    Int      @map("tier2_max_load")
+  tier2Rate       Decimal  @map("tier2_rate")
+  tier3Rate       Decimal  @map("tier3_rate")
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  createdBy       User?    @relation("SettlementTierCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  settlements     Settlement[]
+
+  @@index([isActive], map: "idx_settlement_tier_configs_is_active")
+  @@map("settlement_tier_configs")
+}
+
+model SettlementDirectCustomerException {
+  id              String   @id
+  customerId      String   @unique @map("customer_id")
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy       User?    @relation("SettlementDirectExceptionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@map("settlement_direct_customer_exceptions")
+}
+
+model Settlement {
+  id                       String                       @id
+  userId                   String                       @map("user_id")
+  month                    Int
+  year                     Int
+  calculationMethod        SettlementCalculationMethod  @map("calculation_method")
+  status                   SettlementStatus             @default(ACTIVE)
+  overriddenAt             DateTime?                    @map("overridden_at")
+  overriddenByUserId       String?                      @map("overridden_by_user_id")
+  supersededBySettlementId String?                      @map("superseded_by_settlement_id")
+  defaultFlatPay           Decimal                      @map("default_flat_pay")
+  brokerLoadCount          Int                          @default(0) @map("broker_load_count")
+  directExceptionLoadCount Int                          @default(0) @map("direct_exception_load_count")
+  directStandardLoadCount  Int                          @default(0) @map("direct_standard_load_count")
+  tierApplied              Int                          @map("tier_applied")
+  tierRate                 Decimal                      @map("tier_rate")
+  totalLoadCompensation    Decimal                      @map("total_load_compensation")
+  totalSettlementAmount    Decimal                      @map("total_settlement_amount")
+  excludedLoadsJson        Json                         @default("[]") @map("excluded_loads_json")
+  crossMonthLoadsJson      Json                         @default("[]") @map("cross_month_loads_json")
+  generatedByUserId        String                       @map("generated_by_user_id")
+  tierVersion              Int                          @map("tier_version")
+  createdAt                DateTime                     @default(now()) @map("created_at")
+
+  user                     User                         @relation("SettlementUser", fields: [userId], references: [id], onDelete: Cascade)
+  generatedBy              User                         @relation("SettlementGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: Restrict)
+  overriddenBy             User?                        @relation("SettlementOverriddenBy", fields: [overriddenByUserId], references: [id], onDelete: SetNull)
+  supersededBySettlement   Settlement?                  @relation("SettlementSupersededBy", fields: [supersededBySettlementId], references: [id], onDelete: SetNull)
+  supersededSettlements    Settlement[]                 @relation("SettlementSupersededBy")
+  entries                  SettlementLoadEntry[]        @relation("SettlementLoadEntrySettlement")
+  previousSettlementEntries SettlementLoadEntry[]       @relation("SettlementLoadEntryPreviousSettlement")
+  tierConfig               SettlementTierConfig         @relation(fields: [tierVersion], references: [version])
+
+  @@index([userId, year, month], map: "idx_settlements_user_month_year")
+  @@index([tierVersion], map: "idx_settlements_tier_version")
+  @@map("settlements")
+}
+
+model SettlementLoadEntry {
+  id                      String                  @id
+  settlementId            String                  @map("settlement_id")
+  userId                  String                  @map("user_id")
+  loadId                  String?                 @map("load_id")
+  entryType               SettlementLoadEntryType @map("entry_type")
+  compensationAmount      Decimal                 @map("compensation_amount")
+  customerTypeSnapshot    String?                 @map("customer_type_snapshot")
+  statusSnapshot          LoadStatus?             @map("status_snapshot")
+  revenueSnapshot         Decimal                 @map("revenue_snapshot")
+  puDateSnapshot          DateTime?               @map("pu_date_snapshot")
+  delDateSnapshot         DateTime?               @map("del_date_snapshot")
+  loadRefNumberSnapshot   String?                 @map("load_ref_number_snapshot")
+  mcleodOrderIdSnapshot   String?                 @map("mcleod_order_id_snapshot")
+  customerNameSnapshot    String?                 @map("customer_name_snapshot")
+  previousSettlementId    String?                 @map("previous_settlement_id")
+  previousSettlementMonth Int?                    @map("previous_settlement_month")
+  previousSettlementYear  Int?                    @map("previous_settlement_year")
+  createdAt               DateTime                @default(now()) @map("created_at")
+
+  settlement              Settlement              @relation("SettlementLoadEntrySettlement", fields: [settlementId], references: [id], onDelete: Cascade)
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  load                    Load?                   @relation(fields: [loadId], references: [id], onDelete: SetNull)
+  previousSettlement      Settlement?             @relation("SettlementLoadEntryPreviousSettlement", fields: [previousSettlementId], references: [id], onDelete: SetNull)
+
+  @@index([settlementId], map: "idx_settlement_load_entries_settlement_id")
+  @@index([loadId], map: "idx_settlement_load_entries_load_id")
+  @@index([userId], map: "idx_settlement_load_entries_user_id")
+  @@map("settlement_load_entries")
 }

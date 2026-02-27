@@ -32,12 +32,38 @@ enum LoadStatus {
   @@map("load_status")
 }
 
+enum SettlementCalculationMethod {
+  PU
+  DELIVERY
+
+  @@map("settlement_calculation_method")
+}
+
+enum SettlementStatus {
+  ACTIVE
+  OVERRIDDEN
+
+  @@map("settlement_status")
+}
+
+enum SettlementLoadEntryType {
+  BROKER
+  DIRECT_EXCEPTION
+  DIRECT_STANDARD
+  EXCLUDED_TONU
+  CROSS_MONTH
+
+  @@map("settlement_load_entry_type")
+}
+
 model User {
   id             String   @id @db.Uuid
   email          String   @unique
   name           String
   role           UserRole @default(DISPATCHER)
   fullLoadAccess Boolean  @default(false) @map("full_load_access")
+  defaultFlatPay Decimal? @map("default_flat_pay") @db.Decimal(12, 2)
+  excludeFromPayroll Boolean @default(false) @map("exclude_from_payroll")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
@@ -46,6 +72,12 @@ model User {
   sentChatMessages    LoadChatMessage[] @relation("LoadChatSender")
   targetedChatMessages LoadChatMessage[] @relation("LoadChatTargetUser")
   chatReadStates       LoadChatRead[]
+  settlementTierConfigs SettlementTierConfig[] @relation("SettlementTierCreatedBy")
+  settlementExceptions  SettlementDirectCustomerException[] @relation("SettlementDirectExceptionCreatedBy")
+  settlementsGenerated  Settlement[] @relation("SettlementGeneratedBy")
+  settlementsForUser    Settlement[] @relation("SettlementUser")
+  settlementsOverridden Settlement[] @relation("SettlementOverriddenBy")
+  settlementLoadEntries SettlementLoadEntry[]
 
   @@map("users")
 }
@@ -59,6 +91,7 @@ model Customer {
   updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   loads       Load[]
+  settlementException SettlementDirectCustomerException?
 
   @@map("customers")
 }
@@ -127,6 +160,7 @@ model Load {
   chatSettings         LoadChatSetting?
   chatRetention        LoadChatRetention?
   chatReadStates       LoadChatRead[]
+  settlementEntries    SettlementLoadEntry[]
 
   @@index([status], map: "idx_loads_status")
   @@index([assignedDispatcherId], map: "idx_loads_dispatcher")
@@ -186,4 +220,105 @@ model LoadChatRead {
   @@id([userId, loadId])
   @@index([loadId, userId], map: "idx_load_chat_reads_load_user")
   @@map("load_chat_reads")
+}
+
+model SettlementTierConfig {
+  id              String   @id @db.Uuid
+  version         Int      @unique
+  isActive        Boolean  @default(false) @map("is_active")
+  brokerLoadPay   Decimal  @map("broker_load_pay") @db.Decimal(12, 2)
+  tier1MaxLoad    Int      @map("tier1_max_load")
+  tier1Rate       Decimal  @map("tier1_rate") @db.Decimal(12, 2)
+  tier2MaxLoad    Int      @map("tier2_max_load")
+  tier2Rate       Decimal  @map("tier2_rate") @db.Decimal(12, 2)
+  tier3Rate       Decimal  @map("tier3_rate") @db.Decimal(12, 2)
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  createdBy       User?    @relation("SettlementTierCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  settlements     Settlement[]
+
+  @@index([isActive], map: "idx_settlement_tier_configs_is_active")
+  @@map("settlement_tier_configs")
+}
+
+model SettlementDirectCustomerException {
+  id              String   @id @db.Uuid
+  customerId      String   @unique @map("customer_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy       User?    @relation("SettlementDirectExceptionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@map("settlement_direct_customer_exceptions")
+}
+
+model Settlement {
+  id                       String                       @id @db.Uuid
+  userId                   String                       @map("user_id") @db.Uuid
+  month                    Int
+  year                     Int
+  calculationMethod        SettlementCalculationMethod  @map("calculation_method")
+  status                   SettlementStatus             @default(ACTIVE)
+  overriddenAt             DateTime?                    @map("overridden_at") @db.Timestamptz(6)
+  overriddenByUserId       String?                      @map("overridden_by_user_id") @db.Uuid
+  supersededBySettlementId String?                      @map("superseded_by_settlement_id") @db.Uuid
+  defaultFlatPay           Decimal                      @map("default_flat_pay") @db.Decimal(12, 2)
+  brokerLoadCount          Int                          @default(0) @map("broker_load_count")
+  directExceptionLoadCount Int                          @default(0) @map("direct_exception_load_count")
+  directStandardLoadCount  Int                          @default(0) @map("direct_standard_load_count")
+  tierApplied              Int                          @map("tier_applied")
+  tierRate                 Decimal                      @map("tier_rate") @db.Decimal(12, 2)
+  totalLoadCompensation    Decimal                      @map("total_load_compensation") @db.Decimal(12, 2)
+  totalSettlementAmount    Decimal                      @map("total_settlement_amount") @db.Decimal(12, 2)
+  excludedLoadsJson        Json                         @default("[]") @map("excluded_loads_json")
+  crossMonthLoadsJson      Json                         @default("[]") @map("cross_month_loads_json")
+  generatedByUserId        String                       @map("generated_by_user_id") @db.Uuid
+  tierVersion              Int                          @map("tier_version")
+  createdAt                DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user                     User                         @relation("SettlementUser", fields: [userId], references: [id], onDelete: Cascade)
+  generatedBy              User                         @relation("SettlementGeneratedBy", fields: [generatedByUserId], references: [id], onDelete: Restrict)
+  overriddenBy             User?                        @relation("SettlementOverriddenBy", fields: [overriddenByUserId], references: [id], onDelete: SetNull)
+  supersededBySettlement   Settlement?                  @relation("SettlementSupersededBy", fields: [supersededBySettlementId], references: [id], onDelete: SetNull)
+  supersededSettlements    Settlement[]                 @relation("SettlementSupersededBy")
+  entries                  SettlementLoadEntry[]        @relation("SettlementLoadEntrySettlement")
+  previousSettlementEntries SettlementLoadEntry[]       @relation("SettlementLoadEntryPreviousSettlement")
+  tierConfig               SettlementTierConfig         @relation(fields: [tierVersion], references: [version])
+
+  @@index([userId, year, month], map: "idx_settlements_user_month_year")
+  @@index([tierVersion], map: "idx_settlements_tier_version")
+  @@map("settlements")
+}
+
+model SettlementLoadEntry {
+  id                      String                  @id @db.Uuid
+  settlementId            String                  @map("settlement_id") @db.Uuid
+  userId                  String                  @map("user_id") @db.Uuid
+  loadId                  String?                 @map("load_id") @db.Uuid
+  entryType               SettlementLoadEntryType @map("entry_type")
+  compensationAmount      Decimal                 @map("compensation_amount") @db.Decimal(12, 2)
+  customerTypeSnapshot    String?                 @map("customer_type_snapshot")
+  statusSnapshot          LoadStatus?             @map("status_snapshot")
+  revenueSnapshot         Decimal                 @map("revenue_snapshot") @db.Decimal(12, 2)
+  puDateSnapshot          DateTime?               @map("pu_date_snapshot") @db.Date
+  delDateSnapshot         DateTime?               @map("del_date_snapshot") @db.Date
+  loadRefNumberSnapshot   String?                 @map("load_ref_number_snapshot")
+  mcleodOrderIdSnapshot   String?                 @map("mcleod_order_id_snapshot")
+  customerNameSnapshot    String?                 @map("customer_name_snapshot")
+  previousSettlementId    String?                 @map("previous_settlement_id") @db.Uuid
+  previousSettlementMonth Int?                    @map("previous_settlement_month")
+  previousSettlementYear  Int?                    @map("previous_settlement_year")
+  createdAt               DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  settlement              Settlement              @relation("SettlementLoadEntrySettlement", fields: [settlementId], references: [id], onDelete: Cascade)
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  load                    Load?                   @relation(fields: [loadId], references: [id], onDelete: SetNull)
+  previousSettlement      Settlement?             @relation("SettlementLoadEntryPreviousSettlement", fields: [previousSettlementId], references: [id], onDelete: SetNull)
+
+  @@index([settlementId], map: "idx_settlement_load_entries_settlement_id")
+  @@index([loadId], map: "idx_settlement_load_entries_load_id")
+  @@index([userId], map: "idx_settlement_load_entries_user_id")
+  @@map("settlement_load_entries")
 }

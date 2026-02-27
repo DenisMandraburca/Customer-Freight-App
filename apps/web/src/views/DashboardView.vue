@@ -158,6 +158,10 @@
               />
               <SettlementTab
                 v-else-if="activeTab === 'settlement'"
+                :users="users"
+                :customers="customers"
+                :current-user="currentUser"
+                @refresh="refreshData"
               />
             </template>
           </div>

@@ -1315,6 +1315,296 @@ integration('API integration', () => {
     expect(clearDenied.status).toBe(403);
   });
 
+  it('settlements: generates with exclusions, tier, and category compensation', async () => {
+    const brokerCustomer = await ctx.repository.createCustomer({
+      name: 'Broker Ops',
+      type: 'Broker',
+      quoteAccept: false,
+    });
+    const directExceptionCustomer = await ctx.repository.createCustomer({
+      name: 'Direct Exception LLC',
+      type: 'Direct Customer',
+      quoteAccept: false,
+    });
+
+    await ctx.request
+      .patch(`/api/customer-freight/settlements/users/${ctx.users.accountManager.id}/default-flat-pay`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ defaultFlatPay: 1000 });
+
+    await ctx.request
+      .put('/api/customer-freight/settlements/config/direct-exceptions')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ customerIds: [directExceptionCustomer.id] });
+
+    const createLoad = async (
+      customerId: string,
+      ref: string,
+      puDate: string,
+      delDate: string,
+      rate: number,
+      miles: number,
+    ): Promise<string> => {
+      const response = await ctx.request
+        .post('/api/customer-freight/loads')
+        .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+        .send({
+          customerId,
+          accountManagerId: ctx.users.accountManager.id,
+          loadRefNumber: ref,
+          puCity: 'Chicago',
+          puState: 'IL',
+          puDate,
+          delCity: 'Dallas',
+          delState: 'TX',
+          delDate,
+          rate,
+          miles,
+        });
+      expect(response.status).toBe(201);
+      return response.body.data.id as string;
+    };
+
+    await createLoad(brokerCustomer.id, 'SETTLE-BROKER-1', '2026-01-10', '2026-01-12', 1500, 700);
+    await createLoad(directExceptionCustomer.id, 'SETTLE-EXC-1', '2026-01-11', '2026-01-13', 1200, 500);
+    await createLoad(ctx.customer.id, 'SETTLE-STD-1', '2026-01-12', '2026-01-14', 1100, 400);
+
+    const tonuLoadId = await createLoad(ctx.customer.id, 'SETTLE-TONU-LOW', '2026-01-13', '2026-01-15', 100, 50);
+    const cancelLoadId = await createLoad(ctx.customer.id, 'SETTLE-CANCEL-1', '2026-01-14', '2026-01-16', 900, 300);
+
+    const tonuStatusResponse = await ctx.request
+      .patch(`/api/customer-freight/loads/${tonuLoadId}/status`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ status: 'TONU', reason: 'No truck available' });
+    expect(tonuStatusResponse.status).toBe(200);
+
+    const cancelStatusResponse = await ctx.request
+      .patch(`/api/customer-freight/loads/${cancelLoadId}/status`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ status: 'CANCELED', reason: 'Canceled by customer' });
+    expect(cancelStatusResponse.status).toBe(200);
+
+    const generateResponse = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 1,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+
+    expect(generateResponse.status).toBe(201);
+    expect(generateResponse.body.data.summary.defaultFlatPay).toBe(1000);
+    expect(generateResponse.body.data.summary.brokerLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.directExceptionLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.directStandardLoadCount).toBe(1);
+    expect(generateResponse.body.data.summary.totalLoadCompensation).toBe(20);
+    expect(generateResponse.body.data.summary.totalSettlementAmount).toBe(1020);
+    expect(generateResponse.body.data.excludedTonuLoads).toHaveLength(1);
+    expect(generateResponse.body.data.excludedTonuLoads[0].loadRefNumber).toBe('SETTLE-TONU-LOW');
+  });
+
+  it('settlements: duplicate generation blocks unless override=true', async () => {
+    await ctx.request
+      .patch(`/api/customer-freight/settlements/users/${ctx.users.accountManager.id}/default-flat-pay`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ defaultFlatPay: 500 });
+
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        loadRefNumber: 'SETTLE-DUP-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        puDate: '2026-03-10',
+        delCity: 'Dallas',
+        delState: 'TX',
+        delDate: '2026-03-12',
+        rate: 1000,
+        miles: 500,
+      });
+    expect(loadResponse.status).toBe(201);
+
+    const firstGenerate = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 3,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+    expect(firstGenerate.status).toBe(201);
+    const firstId = firstGenerate.body.data.id as string;
+
+    const duplicate = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 3,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error).toBe('SETTLEMENT_EXISTS');
+
+    const override = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 3,
+        year: 2026,
+        calculationMethod: 'PU',
+        override: true,
+      });
+    expect(override.status).toBe(201);
+    const secondId = override.body.data.id as string;
+    expect(secondId).not.toBe(firstId);
+
+    const firstDetail = await ctx.repository.getSettlementDetailById(firstId);
+    expect(firstDetail?.status).toBe('OVERRIDDEN');
+    expect(firstDetail?.superseded_by_settlement_id).toBe(secondId);
+  });
+
+  it('settlements: cross-month adjustment prevents double payment when method changes', async () => {
+    await ctx.request
+      .patch(`/api/customer-freight/settlements/users/${ctx.users.accountManager.id}/default-flat-pay`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ defaultFlatPay: 800 });
+
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        loadRefNumber: 'SETTLE-CROSS-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        puDate: '2026-01-31',
+        delCity: 'Dallas',
+        delState: 'TX',
+        delDate: '2026-02-02',
+        rate: 1000,
+        miles: 500,
+      });
+    expect(loadResponse.status).toBe(201);
+
+    const january = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 1,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+    expect(january.status).toBe(201);
+    expect(january.body.data.summary.totalLoadCompensation).toBe(10);
+
+    const february = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 2,
+        year: 2026,
+        calculationMethod: 'DELIVERY',
+      });
+    expect(february.status).toBe(201);
+    expect(february.body.data.crossMonthLoads).toHaveLength(1);
+    expect(february.body.data.crossMonthLoads[0].loadRefNumber).toBe('SETTLE-CROSS-1');
+    expect(february.body.data.summary.totalLoadCompensation).toBe(0);
+    expect(february.body.data.summary.totalSettlementAmount).toBe(800);
+  });
+
+  it('settlements: PDF export returns a PDF payload', async () => {
+    await ctx.request
+      .patch(`/api/customer-freight/settlements/users/${ctx.users.accountManager.id}/default-flat-pay`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({ defaultFlatPay: 600 });
+
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        loadRefNumber: 'SETTLE-PDF-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        puDate: '2026-05-10',
+        delCity: 'Dallas',
+        delState: 'TX',
+        delDate: '2026-05-11',
+        rate: 1000,
+        miles: 500,
+      });
+    expect(loadResponse.status).toBe(201);
+
+    const generateResponse = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 5,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+    expect(generateResponse.status).toBe(201);
+
+    const pdfResponse = await ctx.request
+      .get(`/api/customer-freight/settlements/${generateResponse.body.data.id}/pdf`)
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager));
+    expect(pdfResponse.status).toBe(200);
+    expect(pdfResponse.headers['content-type']).toContain('application/pdf');
+    const bodyLength = Buffer.isBuffer(pdfResponse.body)
+      ? pdfResponse.body.length
+      : typeof pdfResponse.text === 'string'
+        ? pdfResponse.text.length
+        : 0;
+    expect(bodyLength).toBeGreaterThan(100);
+  });
+
+  it('settlements: missing default flat pay blocks generation', async () => {
+    const loadResponse = await ctx.request
+      .post('/api/customer-freight/loads')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        customerId: ctx.customer.id,
+        accountManagerId: ctx.users.accountManager.id,
+        loadRefNumber: 'SETTLE-NO-FLAT-1',
+        puCity: 'Chicago',
+        puState: 'IL',
+        puDate: '2026-04-10',
+        delCity: 'Dallas',
+        delState: 'TX',
+        delDate: '2026-04-11',
+        rate: 1000,
+        miles: 500,
+      });
+    expect(loadResponse.status).toBe(201);
+
+    const response = await ctx.request
+      .post('/api/customer-freight/settlements/generate')
+      .set('x-test-session', ctx.sessionHeaderFor(ctx.users.manager))
+      .send({
+        userId: ctx.users.accountManager.id,
+        month: 4,
+        year: 2026,
+        calculationMethod: 'PU',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('VALIDATION_ERROR');
+  });
+
   it('customer-freight:admin permission grants effective admin access', async () => {
     const viewer = await ctx.repository.createUser({
       email: 'viewer.admin@afctransport.com',

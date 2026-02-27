@@ -8,6 +8,11 @@ import type {
   LoadChatLoadSummaryRecord,
   LoadChatMessageRecord,
   LoadRecord,
+  SettlementCalculationMethod,
+  SettlementConfig,
+  SettlementDetail,
+  SettlementRecord,
+  SettlementTierConfig,
   SessionUser,
   UserRecord,
 } from '@/types/models';
@@ -448,4 +453,69 @@ export async function deleteAllLoadsDev(): Promise<{ deletedCount: number }> {
   return unwrap<{ deletedCount: number }>('/api/customer-freight/loads/dev/all', {
     method: 'DELETE',
   });
+}
+
+export async function getSettlementConfig(): Promise<SettlementConfig> {
+  return unwrap<SettlementConfig>('/api/customer-freight/settlements/config');
+}
+
+export async function updateSettlementDirectExceptions(customerIds: string[]): Promise<{ customerIds: string[] }> {
+  return unwrap<{ customerIds: string[] }>('/api/customer-freight/settlements/config/direct-exceptions', {
+    method: 'PUT',
+    body: JSON.stringify({ customerIds }),
+  });
+}
+
+export async function updateSettlementTier(payload: {
+  brokerLoadPay: number;
+  tier1MaxLoad: number;
+  tier1Rate: number;
+  tier2MaxLoad: number;
+  tier2Rate: number;
+  tier3Rate: number;
+}): Promise<SettlementTierConfig> {
+  return unwrap<SettlementTierConfig>('/api/customer-freight/settlements/config/tier', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateUserDefaultFlatPay(
+  userId: string,
+  defaultFlatPay: number | null,
+  excludeFromPayroll?: boolean,
+): Promise<{ userId: string; defaultFlatPay: number | null; excludeFromPayroll: boolean }> {
+  return unwrap<{ userId: string; defaultFlatPay: number | null; excludeFromPayroll: boolean }>(
+    `/api/customer-freight/settlements/users/${userId}/default-flat-pay`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ defaultFlatPay, excludeFromPayroll }),
+    },
+  );
+}
+
+export async function generateSettlement(payload: {
+  userId: string;
+  month: number;
+  year: number;
+  calculationMethod: SettlementCalculationMethod;
+  override?: boolean;
+}): Promise<SettlementDetail> {
+  return unwrap<SettlementDetail>('/api/customer-freight/settlements/generate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listSettlements(limit = 100): Promise<SettlementRecord[]> {
+  const query = new URLSearchParams({ limit: String(limit) }).toString();
+  return unwrap<SettlementRecord[]>(`/api/customer-freight/settlements?${query}`);
+}
+
+export async function getSettlementDetail(settlementId: string): Promise<SettlementDetail> {
+  return unwrap<SettlementDetail>(`/api/customer-freight/settlements/${settlementId}`);
+}
+
+export function getSettlementPdfUrl(settlementId: string): string {
+  return `/api/customer-freight/settlements/${settlementId}/pdf`;
 }

@@ -105,6 +105,8 @@ export interface UserRecord {
   name: string;
   role: UserRole;
   full_load_access: boolean;
+  default_flat_pay: string | null;
+  exclude_from_payroll: boolean;
 }
 
 export interface GreenbushRecord {
@@ -130,4 +132,75 @@ export interface ApiErrorEnvelope {
   success: false;
   error: string;
   message: string;
+}
+
+export type SettlementCalculationMethod = 'PU' | 'DELIVERY';
+
+export interface SettlementLoadEntry {
+  id: string;
+  settlementId: string;
+  loadId: string | null;
+  entryType: 'BROKER' | 'DIRECT_EXCEPTION' | 'DIRECT_STANDARD' | 'EXCLUDED_TONU' | 'CROSS_MONTH';
+  compensationAmount: number;
+  customerType: string | null;
+  status: LoadStatus | null;
+  revenue: number;
+  puDate: string | null;
+  delDate: string | null;
+  loadRefNumber: string | null;
+  mcleodOrderId: string | null;
+  customerName: string | null;
+  previousSettlementId: string | null;
+  previousSettlementMonth: number | null;
+  previousSettlementYear: number | null;
+}
+
+export interface SettlementRecord {
+  id: string;
+  summary: {
+    userId: string;
+    userName: string;
+    month: number;
+    year: number;
+    calculationMethod: SettlementCalculationMethod;
+    defaultFlatPay: number;
+    brokerLoadCount: number;
+    directExceptionLoadCount: number;
+    directStandardLoadCount: number;
+    tierApplied: number;
+    tierRate: number;
+    totalLoadCompensation: number;
+    totalSettlementAmount: number;
+    generatedByUserId: string;
+    generatedByName: string;
+    tierVersion: number;
+    createdAt: string;
+    status: 'ACTIVE' | 'OVERRIDDEN';
+  };
+}
+
+export interface SettlementDetail extends SettlementRecord {
+  brokerLoads: SettlementLoadEntry[];
+  directExceptionLoads: SettlementLoadEntry[];
+  directStandardLoads: SettlementLoadEntry[];
+  excludedTonuLoads: SettlementLoadEntry[];
+  crossMonthLoads: SettlementLoadEntry[];
+}
+
+export interface SettlementTierConfig {
+  id: string;
+  version: number;
+  brokerLoadPay: number;
+  tier1MaxLoad: number;
+  tier1Rate: number;
+  tier2MaxLoad: number;
+  tier2Rate: number;
+  tier3Rate: number;
+  createdByUserId: string | null;
+  createdAt: string;
+}
+
+export interface SettlementConfig {
+  tierConfig: SettlementTierConfig;
+  directExceptionCustomerIds: string[];
 }

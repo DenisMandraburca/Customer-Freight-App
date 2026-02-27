@@ -15,6 +15,7 @@ import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
 import { greenbushRouter } from './routes/greenbush.js';
 import { loadsRouter } from './routes/loads.js';
+import { settlementsRouter } from './routes/settlements.js';
 
 export interface CreateAppOptions {
   portalSessionMiddleware?: express.RequestHandler;
@@ -120,6 +121,7 @@ export function createApp(repository: FreightRepository, options: CreateAppOptio
   app.use(apiBasePath, loadsRouter(repository));
   app.use(apiBasePath, chatRouter(repository));
   app.use(apiBasePath, greenbushRouter(repository));
+  app.use(apiBasePath, settlementsRouter(repository));
   app.use(apiBasePath, adminRouter(repository));
 
   app.use(errorHandler);
